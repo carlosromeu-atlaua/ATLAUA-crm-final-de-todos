@@ -1,6 +1,10 @@
-import React from 'react';
-import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { createClient } from "@supabase/supabase-js";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+
+const SUPABASE_URL = "https://iwkfribpdpaeglaogxkx.supabase.co";
+const SUPABASE_KEY = "sb_publishable_3Jb6ozoasZI7Xa0In9SSEA_UZkq-IiS";
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const TEAL = "#04BDB7", BEIGE = "#FFF8E8", BORD = "#800032", DARK = "#303030", LGRAY = "#C0C0C0", WHITE = "#FFFFFF";
 
@@ -575,21 +579,44 @@ function Contacts({contacts}) {
 const NAV=[{id:"Dashboard",ic:"◈"},{id:"Athletes",ic:"◉"},{id:"Agencies",ic:"◎"},{id:"Teams",ic:"◍"},{id:"Pipeline",ic:"▤"},{id:"Contacts",ic:"◫"}];
 
 export default function App() {
-  const [athletes,setAthletes]=useState(initAthletes);
+  const [athletes,setAthletes]=useState([]);
   const [contacts,setContacts]=useState([]);
   const [page,setPage]=useState("Dashboard");
   const [sel,setSel]=useState(null);
   const [showAdd,setShowAdd]=useState(false);
+  const [loading,setLoading]=useState(true);
 
-  const upd=useCallback((id,u)=>{
-    setAthletes(p=>p.map(a=>a.id===id?{...a,...u}:a));
-    setSel(p=>p?.id===id?{...p,...u}:p);
+  useEffect(()=>{
+    async function loadData(){
+      setLoading(true);
+      const [{data:ath},{data:con}]=await Promise.all([
+        supabase.from("athletes").select("*").order("id"),
+        supabase.from("contacts").select("*").order("id")
+      ]);
+      if(ath) setAthletes(ath);
+      if(con) setContacts(con);
+      setLoading(false);
+    }
+    loadData();
   },[]);
 
-  const addNew=(item,type)=>{
-    if(type==="contact") setContacts(p=>[...p,item]);
-    else setAthletes(p=>[...p,item]);
+  const upd=useCallback(async (id,u)=>{
+    setAthletes(p=>p.map(a=>a.id===id?{...a,...u}:a));
+    setSel(p=>p?.id===id?{...p,...u}:p);
+    await supabase.from("athletes").update(u).eq("id",id);
+  },[]);
+
+  const addNew=async (item,type)=>{
+    if(type==="contact"){
+      const {data}=await supabase.from("contacts").insert([item]).select();
+      if(data) setContacts(p=>[...p,data[0]]);
+    } else {
+      const {data}=await supabase.from("athletes").insert([item]).select();
+      if(data) setAthletes(p=>[...p,data[0]]);
+    }
   };
+
+  if(loading) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:BEIGE,fontFamily:"sans-serif",color:TEAL,fontSize:18,letterSpacing:2}}>Loading...</div>;
 
   return (
     <div style={{display:"flex",height:"100vh",background:BEIGE,overflow:"hidden",fontFamily:"sans-serif"}}>
