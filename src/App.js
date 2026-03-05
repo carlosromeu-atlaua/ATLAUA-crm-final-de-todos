@@ -6,7 +6,6 @@ const SUPABASE_URL = "https://iwkfribpdpaeglaogxkx.supabase.co";
 const SUPABASE_KEY = "sb_publishable_3Jb6ozoasZI7Xa0In9SSEA_UZkq-IiS";
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const TEAL = "#04BDB7", BEIGE = "#FFF8E8", BORD = "#800032", DARK = "#303030", LGRAY = "#C0C0C0", WHITE = "#FFFFFF";
 
 const DATA = [
   ["Paul Corbeil","Boston Bruins","NHL","Paraphe Sports Management","Paul Corbeil","paulcorbeil@paraphe.ca","Contacted"],
@@ -663,232 +662,262 @@ const DATA = [
   ["Demone Harris","","","Disruptive","Henry Organ","henry@disruptivesports.com","Contacted"]
 ];
 
+
+
 const TODAY = new Date().toISOString().split("T")[0];
 const LEAGUES = ["NFL","NBA","NHL","MLB","UFC"];
 const ICONS = {NFL:"🏈",NBA:"🏀",NHL:"🏒",MLB:"⚾",UFC:"🥊"};
 const STATUSES = ["Contacted","Negotiating","Proposal Sent","Closed Won","Closed Lost","Pending"];
+
+// ── DESIGN TOKENS ──────────────────────────────────────────────────
+const TEAL = "#04BDB7", BEIGE = "#FFF8E8", BORD = "#800032", DARK = "#303030";
+const LGRAY = "#C0C0C0", WHITE = "#FFFFFF", NAVY = "#12122A", MGRAY = "#F5F2EA";
 const SCOL = {Contacted:BORD, Negotiating:TEAL, "Proposal Sent":"#B07800", "Closed Won":"#2A7A50", "Closed Lost":"#666", Pending:LGRAY};
 const PCOLS = [TEAL,BORD,"#B07800","#4A6FA5","#7B4EA6","#2A7A50"];
+const CAT_COL = {Distributor:TEAL, Brand:BORD, Media:"#4A6FA5", Partner:"#2A7A50", Other:LGRAY};
+const CAT_ICON = {Distributor:"🏭", Brand:"⭐", Media:"📰", Partner:"🤝", Other:"📌"};
 
-function initAthletes() {
-  return DATA.map((r,i) => ({ id:i+1, name:r[0], team:r[1], league:r[2], agency:r[3], agent:r[4], email:r[5], status:r[6], notes:"", updated:TODAY }));
-}
-
-// ── SMALL COMPONENTS ──────────────────────────────────────────────
+// ── SMALL COMPONENTS ───────────────────────────────────────────────
 function Badge({s}) {
-  return <span style={{background:SCOL[s]||LGRAY,color:WHITE,fontSize:10,fontWeight:700,padding:"2px 9px",borderRadius:20,fontFamily:"sans-serif",whiteSpace:"nowrap"}}>{s}</span>;
+  return <span style={{background:SCOL[s]||LGRAY,color:WHITE,fontSize:10,fontWeight:700,padding:"3px 10px",borderRadius:20,fontFamily:"sans-serif",whiteSpace:"nowrap",letterSpacing:.5}}>{s}</span>;
 }
 function Pill({league}) {
-  return <span style={{background:"#f0ede4",border:`1px solid ${LGRAY}`,color:DARK,fontSize:11,padding:"1px 8px",borderRadius:20,fontFamily:"sans-serif",fontWeight:600}}>{ICONS[league]||""} {league}</span>;
+  const c={NFL:BORD,NBA:TEAL,NHL:"#4A6FA5",MLB:"#2A7A50",UFC:"#7B4EA6"};
+  return <span style={{background:`${c[league]||LGRAY}18`,border:`1px solid ${c[league]||LGRAY}44`,color:c[league]||LGRAY,fontSize:11,padding:"2px 9px",borderRadius:20,fontFamily:"sans-serif",fontWeight:700}}>{league}</span>;
 }
-function H({children,sub}) {
-  return <div style={{marginBottom:24}}>
-    <div style={{fontFamily:"Georgia,serif",color:BORD,fontSize:20,fontWeight:700,letterSpacing:2,textTransform:"uppercase"}}>{children}</div>
-    {sub&&<div style={{fontFamily:"sans-serif",color:LGRAY,fontSize:12,marginTop:3}}>{sub}</div>}
+function PageTitle({title, sub, children}) {
+  return <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:28}}>
+    <div>
+      <div style={{fontFamily:"Georgia,serif",color:NAVY,fontSize:24,fontWeight:700,letterSpacing:1}}>{title}</div>
+      {sub&&<div style={{fontFamily:"sans-serif",color:LGRAY,fontSize:13,marginTop:4}}>{sub}</div>}
+    </div>
+    {children}
   </div>;
 }
-function Kpi({label,val,color}) {
-  return <div style={{background:WHITE,borderRadius:10,padding:"18px 22px",borderTop:`3px solid ${color||TEAL}`,boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>
-    <div style={{fontFamily:"sans-serif",fontSize:10,color:BORD,letterSpacing:2,textTransform:"uppercase",marginBottom:8}}>{label}</div>
-    <div style={{fontFamily:"Georgia,serif",fontSize:34,fontWeight:700,color:color||TEAL,lineHeight:1}}>{val}</div>
-  </div>;
+function Card({children, style={}}) {
+  return <div style={{background:WHITE,borderRadius:12,boxShadow:"0 2px 12px rgba(0,0,0,0.07)",border:"1px solid #EBE7DC",...style}}>{children}</div>;
+}
+function Stat({label, val, color=TEAL, icon}) {
+  return <Card style={{padding:"20px 24px",borderTop:`3px solid ${color}`}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+      <div>
+        <div style={{fontFamily:"sans-serif",fontSize:10,color:BORD,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>{label}</div>
+        <div style={{fontFamily:"Georgia,serif",fontSize:36,fontWeight:700,color,lineHeight:1}}>{val}</div>
+      </div>
+      {icon&&<div style={{fontSize:24,opacity:.5}}>{icon}</div>}
+    </div>
+  </Card>;
 }
 
-// ── SIDE PANEL ────────────────────────────────────────────────────
+// ── SIDE PANEL ─────────────────────────────────────────────────────
 function Panel({a, onClose, onSave}) {
-  const [st, setSt] = useState(a.status);
-  const [notes, setNotes] = useState(a.notes);
-  const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  const save = () => onSave(a.id, {status:st, notes, updated:TODAY});
-
-  const gen = async () => {
-    setLoading(true); setEmail("");
+  const [st,setSt]=useState(a.status);
+  const [notes,setNotes]=useState(a.notes||"");
+  const [email,setEmail]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [copied,setCopied]=useState(false);
+  const save=()=>onSave(a.id,{status:st,notes,updated:TODAY});
+  const gen=async()=>{
+    setLoading(true);setEmail("");
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:300,
-          messages:[{role:"user",content:`You are a brand partnership manager at ATLAUA — God of Water, a premium sports lifestyle brand (electrolyzed water + CBD recovery drink). Write a short warm first-contact email to ${a.agent} at ${a.agency}, representing ${a.name} (${a.team||"independent"}, ${a.league}). Propose a brand ambassador partnership. Tone: bold, luxurious, motivating. Include subject line. Max 120 words.`}]})
-      });
-      const d = await res.json();
-      setEmail(d.content?.[0]?.text || "Error generating email.");
-    } catch { setEmail("Connection error. Check API key."); }
+      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:300,
+          messages:[{role:"user",content:`You are a brand partnership manager at ATLAUA — God of Water, a premium sports lifestyle brand (electrolyzed water + CBD recovery drink). Write a short warm first-contact email to ${a.agent} at ${a.agency}, representing ${a.name} (${a.team||"independent"}, ${a.league}). Propose a brand ambassador partnership. Tone: bold, luxurious, motivating. Include subject line. Max 120 words.`}]})});
+      const d=await res.json();
+      setEmail(d.content?.[0]?.text||"Error generating email.");
+    } catch{setEmail("Connection error.");}
     setLoading(false);
   };
-
+  const inp={width:"100%",padding:"9px 12px",borderRadius:8,border:"1.5px solid #EBE7DC",fontFamily:"sans-serif",fontSize:14,background:BEIGE,boxSizing:"border-box",outline:"none"};
+  const lbl={display:"block",fontSize:10,fontFamily:"sans-serif",color:BORD,letterSpacing:2,textTransform:"uppercase",marginBottom:5,fontWeight:700};
   return <>
-    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.3)",zIndex:99}} />
-    <div style={{position:"fixed",top:0,right:0,width:420,height:"100vh",background:WHITE,zIndex:100,display:"flex",flexDirection:"column",boxShadow:"-6px 0 30px rgba(0,0,0,0.12)",overflowY:"auto"}}>
-      <div style={{background:BEIGE,padding:"24px 24px 20px",borderBottom:`1px solid #e8e0cc`}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-          <div>
-            <div style={{fontFamily:"Georgia,serif",color:BORD,fontSize:20,fontWeight:700,marginBottom:8}}>{a.name}</div>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}><Pill league={a.league}/>{a.team&&<span style={{background:WHITE,border:`1px solid ${LGRAY}`,color:DARK,fontSize:11,padding:"1px 8px",borderRadius:20,fontFamily:"sans-serif"}}>{a.team}</span>}<Badge s={st}/></div>
-          </div>
-          <button onClick={onClose} style={{background:"none",border:"none",fontSize:24,cursor:"pointer",color:LGRAY,lineHeight:1}}>×</button>
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(18,18,42,0.45)",zIndex:99,backdropFilter:"blur(2px)"}}/>
+    <div style={{position:"fixed",top:0,right:0,width:440,height:"100vh",background:WHITE,zIndex:100,display:"flex",flexDirection:"column",boxShadow:"-8px 0 40px rgba(0,0,0,0.15)",overflowY:"auto"}}>
+      <div style={{background:`linear-gradient(135deg,${NAVY} 0%,#1e1e45 100%)`,padding:"28px 26px 22px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+          <div style={{fontSize:10,fontFamily:"sans-serif",color:"rgba(255,248,232,0.6)",letterSpacing:3,textTransform:"uppercase"}}>Athlete Profile</div>
+          <button onClick={onClose} style={{background:"rgba(255,255,255,0.1)",border:"none",width:28,height:28,borderRadius:"50%",cursor:"pointer",color:WHITE,fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+        </div>
+        <div style={{fontFamily:"Georgia,serif",color:WHITE,fontSize:22,fontWeight:700,marginBottom:10,lineHeight:1.2}}>{a.name}</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          <Pill league={a.league}/>
+          {a.team&&<span style={{background:"rgba(255,255,255,0.1)",color:"rgba(255,248,232,0.8)",fontSize:11,padding:"2px 10px",borderRadius:20,fontFamily:"sans-serif"}}>{a.team}</span>}
+          <Badge s={st}/>
         </div>
       </div>
-      <div style={{padding:24,flex:1}}>
-        <div style={{background:BEIGE,borderRadius:8,padding:"14px 16px",marginBottom:20}}>
-          <div style={{fontSize:10,fontFamily:"sans-serif",color:LGRAY,letterSpacing:2,textTransform:"uppercase",marginBottom:4}}>Agency</div>
-          <div style={{fontFamily:"Georgia,serif",color:TEAL,fontWeight:700,fontSize:15}}>{a.agency}</div>
-          <div style={{fontFamily:"sans-serif",color:DARK,fontSize:13,marginTop:3}}>{a.agent}</div>
-          {a.email&&<a href={`mailto:${a.email}`} style={{color:TEAL,fontSize:12,fontFamily:"sans-serif",textDecoration:"none",display:"block",marginTop:6}}>✉ {a.email}</a>}
-        </div>
+      <div style={{padding:26,flex:1,background:MGRAY}}>
+        <Card style={{padding:"16px 18px",marginBottom:18}}>
+          <div style={{fontSize:10,fontFamily:"sans-serif",color:LGRAY,letterSpacing:2,textTransform:"uppercase",marginBottom:8}}>Agency & Contact</div>
+          <div style={{fontFamily:"Georgia,serif",color:TEAL,fontWeight:700,fontSize:15,marginBottom:4}}>{a.agency}</div>
+          <div style={{fontFamily:"sans-serif",color:DARK,fontSize:13,marginBottom:4}}>{a.agent}</div>
+          {a.email&&<a href={`mailto:${a.email}`} style={{color:BORD,fontSize:12,fontFamily:"sans-serif",textDecoration:"none",display:"block"}}>✉ {a.email}</a>}
+        </Card>
         <div style={{marginBottom:14}}>
-          <label style={{display:"block",fontSize:10,fontFamily:"sans-serif",color:BORD,letterSpacing:2,textTransform:"uppercase",marginBottom:5}}>Status</label>
-          <select value={st} onChange={e=>setSt(e.target.value)} style={{width:"100%",padding:"9px 12px",borderRadius:6,border:`1.5px solid ${LGRAY}`,fontFamily:"sans-serif",fontSize:14,background:BEIGE}}>
+          <label style={lbl}>Status</label>
+          <select value={st} onChange={e=>setSt(e.target.value)} style={inp}>
             {STATUSES.map(s=><option key={s}>{s}</option>)}
           </select>
         </div>
         <div style={{marginBottom:20}}>
-          <label style={{display:"block",fontSize:10,fontFamily:"sans-serif",color:BORD,letterSpacing:2,textTransform:"uppercase",marginBottom:5}}>Notes</label>
-          <textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={3} placeholder="Add notes..." style={{width:"100%",padding:"9px 12px",borderRadius:6,border:`1.5px solid ${LGRAY}`,fontFamily:"sans-serif",fontSize:13,background:BEIGE,resize:"vertical",boxSizing:"border-box"}}/>
+          <label style={lbl}>Notes</label>
+          <textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={3} placeholder="Add notes…" style={{...inp,resize:"vertical"}}/>
         </div>
-        <button onClick={save} style={{width:"100%",background:TEAL,color:WHITE,border:"none",borderRadius:6,padding:"10px",fontFamily:"sans-serif",fontWeight:700,fontSize:14,cursor:"pointer",marginBottom:24}}>Save Changes</button>
-        <div style={{borderTop:`1px solid #e8e0cc`,paddingTop:20}}>
-          <div style={{fontSize:10,fontFamily:"sans-serif",color:BORD,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>AI Outreach Email</div>
-          <button onClick={gen} disabled={loading} style={{width:"100%",background:loading?"#ccc":BORD,color:WHITE,border:"none",borderRadius:6,padding:"10px",fontFamily:"sans-serif",fontWeight:700,fontSize:14,cursor:loading?"not-allowed":"pointer",marginBottom:12}}>
+        <button onClick={save} style={{width:"100%",background:`linear-gradient(135deg,${TEAL},#02a5a0)`,color:WHITE,border:"none",borderRadius:8,padding:"11px",fontFamily:"sans-serif",fontWeight:700,fontSize:14,cursor:"pointer",marginBottom:20,letterSpacing:.5,boxShadow:`0 4px 16px ${TEAL}44`}}>Save Changes</button>
+        <div style={{borderTop:"1px solid #EBE7DC",paddingTop:20}}>
+          <div style={{fontSize:10,fontFamily:"sans-serif",color:BORD,letterSpacing:2,textTransform:"uppercase",marginBottom:10,fontWeight:700}}>AI Outreach Email</div>
+          <button onClick={gen} disabled={loading} style={{width:"100%",background:loading?LGRAY:`linear-gradient(135deg,${BORD},#9a003a)`,color:WHITE,border:"none",borderRadius:8,padding:"11px",fontFamily:"sans-serif",fontWeight:700,fontSize:14,cursor:loading?"not-allowed":"pointer",marginBottom:12,boxShadow:loading?"none":`0 4px 16px ${BORD}44`}}>
             {loading?"Generating…":"✉ Draft Outreach Email"}
           </button>
-          {email&&<div style={{background:BEIGE,border:`1px solid #e8e0cc`,borderRadius:8,padding:16}}>
+          {email&&<Card style={{padding:16}}>
             <pre style={{whiteSpace:"pre-wrap",margin:0,fontFamily:"sans-serif",fontSize:13,color:DARK,lineHeight:1.65}}>{email}</pre>
-            <button onClick={()=>{navigator.clipboard.writeText(email);setCopied(true);setTimeout(()=>setCopied(false),2000)}} style={{marginTop:10,background:TEAL,color:WHITE,border:"none",borderRadius:4,padding:"5px 14px",cursor:"pointer",fontSize:12,fontFamily:"sans-serif"}}>
+            <button onClick={()=>{navigator.clipboard.writeText(email);setCopied(true);setTimeout(()=>setCopied(false),2000)}} style={{marginTop:10,background:TEAL,color:WHITE,border:"none",borderRadius:6,padding:"5px 14px",cursor:"pointer",fontSize:12,fontFamily:"sans-serif"}}>
               {copied?"✓ Copied":"Copy"}
             </button>
-          </div>}
+          </Card>}
         </div>
-        <div style={{marginTop:16,fontSize:10,color:LGRAY,fontFamily:"sans-serif"}}>Last updated: {a.updated}</div>
+        <div style={{marginTop:16,fontSize:10,color:LGRAY,fontFamily:"sans-serif",textAlign:"right"}}>Last updated: {a.updated}</div>
       </div>
     </div>
   </>;
 }
 
-// ── ADD MODAL ─────────────────────────────────────────────────────
-function AddModal({athletes, onClose, onAdd}) {
+// ── ADD MODAL ──────────────────────────────────────────────────────
+function AddModal({athletes,onClose,onAdd}) {
   const [tab,setTab]=useState("athlete");
   const [af,setAf]=useState({name:"",team:"",league:"NFL",agency:"",agent:"",email:"",status:"Contacted"});
   const [cf,setCf]=useState({name:"",company:"",category:"Distributor",email:"",phone:""});
   const [sug,setSug]=useState([]);
   const agencies=useMemo(()=>[...new Set(athletes.map(a=>a.agency).filter(Boolean))].sort(),[athletes]);
-  const inp={width:"100%",padding:"9px 12px",borderRadius:6,border:`1.5px solid ${LGRAY}`,fontFamily:"sans-serif",fontSize:14,background:BEIGE,boxSizing:"border-box"};
-  const lbl={display:"block",fontSize:10,fontFamily:"sans-serif",color:BORD,letterSpacing:2,textTransform:"uppercase",marginBottom:5};
-  return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.35)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-    <div style={{background:WHITE,borderRadius:12,width:460,maxHeight:"88vh",overflowY:"auto",boxShadow:"0 16px 60px rgba(0,0,0,0.2)"}}>
-      <div style={{padding:"22px 26px 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div style={{fontFamily:"Georgia,serif",color:BORD,fontSize:18,fontWeight:700,letterSpacing:2,textTransform:"uppercase"}}>Add New</div>
-        <button onClick={onClose} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:LGRAY}}>×</button>
+  const inp={width:"100%",padding:"10px 12px",borderRadius:8,border:"1.5px solid #EBE7DC",fontFamily:"sans-serif",fontSize:14,background:WHITE,boxSizing:"border-box",outline:"none"};
+  const lbl={display:"block",fontSize:10,fontFamily:"sans-serif",color:BORD,letterSpacing:2,textTransform:"uppercase",marginBottom:5,fontWeight:700};
+  return <div style={{position:"fixed",inset:0,background:"rgba(18,18,42,0.5)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20,backdropFilter:"blur(3px)"}}>
+    <div style={{background:WHITE,borderRadius:16,width:480,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 24px 80px rgba(0,0,0,0.25)"}}>
+      <div style={{background:`linear-gradient(135deg,${NAVY},#1e1e45)`,padding:"22px 26px",borderRadius:"16px 16px 0 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{fontFamily:"Georgia,serif",color:WHITE,fontSize:18,fontWeight:700,letterSpacing:1}}>Add New</div>
+        <button onClick={onClose} style={{background:"rgba(255,255,255,0.1)",border:"none",width:30,height:30,borderRadius:"50%",cursor:"pointer",color:WHITE,fontSize:18}}>×</button>
       </div>
-      <div style={{display:"flex",margin:"16px 26px 0",borderBottom:`1px solid #e8e0cc`}}>
-        {["athlete","contact"].map(t=><button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"9px 0",border:"none",background:"none",cursor:"pointer",fontFamily:"sans-serif",fontWeight:tab===t?700:400,color:tab===t?TEAL:LGRAY,borderBottom:`2px solid ${tab===t?TEAL:"transparent"}`,fontSize:14}}>{t==="athlete"?"Athlete":"Other Contact"}</button>)}
+      <div style={{display:"flex",margin:"0",borderBottom:"1px solid #EBE7DC",background:MGRAY}}>
+        {["athlete","contact"].map(t=><button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"12px 0",border:"none",background:"none",cursor:"pointer",fontFamily:"sans-serif",fontWeight:tab===t?700:400,color:tab===t?TEAL:LGRAY,borderBottom:`3px solid ${tab===t?TEAL:"transparent"}`,fontSize:14,transition:"all 0.15s"}}>{t==="athlete"?"🏃 Athlete":"👤 Other Contact"}</button>)}
       </div>
-      <div style={{padding:"20px 26px 26px"}}>
-        {tab==="athlete"?<div style={{display:"flex",flexDirection:"column",gap:13}}>
+      <div style={{padding:"22px 26px 26px",background:MGRAY}}>
+        {tab==="athlete"?<div style={{display:"flex",flexDirection:"column",gap:14}}>
           {[["name","Name *"],["team","Team"],["agent","Agent Name"],["email","Email"]].map(([k,l])=><div key={k}><label style={lbl}>{l}</label><input value={af[k]} onChange={e=>setAf(f=>({...f,[k]:e.target.value}))} style={inp}/></div>)}
           <div style={{position:"relative"}}>
             <label style={lbl}>Agency</label>
-            <input value={af.agency} onChange={e=>{setAf(f=>({...f,agency:e.target.value}));setSug(e.target.value.length>1?agencies.filter(a=>a.toLowerCase().includes(e.target.value.toLowerCase())).slice(0,5):[])}} style={inp} placeholder="Type to search…"/>
-            {sug.length>0&&<div style={{position:"absolute",top:"100%",left:0,right:0,background:WHITE,border:`1.5px solid ${LGRAY}`,borderRadius:6,zIndex:10,boxShadow:"0 4px 16px rgba(0,0,0,0.1)"}}>
-              {sug.map(a=><div key={a} onClick={()=>{setAf(f=>({...f,agency:a}));setSug([])}} style={{padding:"8px 12px",cursor:"pointer",fontFamily:"sans-serif",fontSize:13}} onMouseEnter={e=>e.target.style.background=BEIGE} onMouseLeave={e=>e.target.style.background=WHITE}>{a}</div>)}
+            <input value={af.agency} onChange={e=>{setAf(f=>({...f,agency:e.target.value}));setSug(e.target.value.length>1?agencies.filter(a=>a.toLowerCase().includes(e.target.value.toLowerCase())).slice(0,5):[])}} style={inp} placeholder="Type to search agencies…"/>
+            {sug.length>0&&<div style={{position:"absolute",top:"100%",left:0,right:0,background:WHITE,border:"1.5px solid #EBE7DC",borderRadius:8,zIndex:10,boxShadow:"0 8px 24px rgba(0,0,0,0.12)"}}>
+              {sug.map(a=><div key={a} onClick={()=>{setAf(f=>({...f,agency:a}));setSug([])}} style={{padding:"10px 14px",cursor:"pointer",fontFamily:"sans-serif",fontSize:13,borderBottom:"1px solid #f5f2ea",transition:"background 0.1s"}} onMouseEnter={e=>e.target.style.background=BEIGE} onMouseLeave={e=>e.target.style.background=WHITE}>{a}</div>)}
             </div>}
           </div>
           <div><label style={lbl}>League</label><select value={af.league} onChange={e=>setAf(f=>({...f,league:e.target.value}))} style={inp}>{LEAGUES.map(l=><option key={l}>{l}</option>)}</select></div>
           <div><label style={lbl}>Status</label><select value={af.status} onChange={e=>setAf(f=>({...f,status:e.target.value}))} style={inp}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
-          <button onClick={()=>{if(!af.name)return;onAdd({...af,id:Date.now(),notes:"",updated:TODAY});onClose()}} style={{background:TEAL,color:WHITE,border:"none",borderRadius:6,padding:"10px",fontFamily:"sans-serif",fontWeight:700,fontSize:14,cursor:"pointer",marginTop:4}}>Add Athlete</button>
-        </div>:<div style={{display:"flex",flexDirection:"column",gap:13}}>
-          {[["name","Name *"],["company","Company"],["email","Email"],["phone","Phone"]].map(([k,l])=><div key={k}><label style={lbl}>{l}</label><input value={cf[k]} onChange={e=>setCf(f=>({...f,[k]:e.target.value}))} style={inp}/></div>)}
-          <div><label style={lbl}>Category</label><select value={cf.category} onChange={e=>setCf(f=>({...f,category:e.target.value}))} style={inp}>{["Distributor","Brand","Media","Partner","Other"].map(c=><option key={c}>{c}</option>)}</select></div>
-          <button onClick={()=>{if(!cf.name)return;onAdd({...cf,id:Date.now(),updated:TODAY},"contact");onClose()}} style={{background:TEAL,color:WHITE,border:"none",borderRadius:6,padding:"10px",fontFamily:"sans-serif",fontWeight:700,fontSize:14,cursor:"pointer",marginTop:4}}>Add Contact</button>
+          <button onClick={()=>{if(!af.name)return;onAdd({...af,id:Date.now(),notes:"",updated:TODAY});onClose()}} style={{background:`linear-gradient(135deg,${TEAL},#02a5a0)`,color:WHITE,border:"none",borderRadius:8,padding:"12px",fontFamily:"sans-serif",fontWeight:700,fontSize:14,cursor:"pointer",marginTop:4,boxShadow:`0 4px 16px ${TEAL}44`}}>Add Athlete</button>
+        </div>:<div style={{display:"flex",flexDirection:"column",gap:14}}>
+          {[["name","Name *"],["company","Company / Brand"],["email","Email"],["phone","Phone"]].map(([k,l])=><div key={k}><label style={lbl}>{l}</label><input value={cf[k]} onChange={e=>setCf(f=>({...f,[k]:e.target.value}))} style={inp}/></div>)}
+          <div><label style={lbl}>Category</label>
+            <select value={cf.category} onChange={e=>setCf(f=>({...f,category:e.target.value}))} style={inp}>
+              {["Distributor","Brand","Media","Partner","Other"].map(c=><option key={c}>{c}</option>)}
+            </select>
+          </div>
+          <button onClick={()=>{if(!cf.name)return;onAdd({...cf,id:Date.now(),updated:TODAY},"contact");onClose()}} style={{background:`linear-gradient(135deg,${BORD},#9a003a)`,color:WHITE,border:"none",borderRadius:8,padding:"12px",fontFamily:"sans-serif",fontWeight:700,fontSize:14,cursor:"pointer",marginTop:4,boxShadow:`0 4px 16px ${BORD}44`}}>Add Contact</button>
         </div>}
       </div>
     </div>
   </div>;
 }
 
-// ── DASHBOARD ─────────────────────────────────────────────────────
-function Dashboard({athletes}) {
+// ── DASHBOARD ──────────────────────────────────────────────────────
+function Dashboard({athletes,contacts}) {
   const byLeague=useMemo(()=>LEAGUES.map(l=>({name:l,value:athletes.filter(a=>a.league===l).length})).filter(x=>x.value>0),[athletes]);
   const bySt=useMemo(()=>STATUSES.map(s=>({name:s,value:athletes.filter(a=>a.status===s).length})).filter(x=>x.value>0),[athletes]);
   const topAg=useMemo(()=>{const m={};athletes.forEach(a=>{if(a.agency)m[a.agency]=(m[a.agency]||0)+1});return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([name,value])=>({name:name.length>22?name.slice(0,22)+"…":name,value}));},[athletes]);
   const agCount=useMemo(()=>new Set(athletes.map(a=>a.agency).filter(Boolean)).size,[athletes]);
+  const neg=athletes.filter(a=>a.status==="Negotiating").length;
+  const won=athletes.filter(a=>a.status==="Closed Won").length;
   return <div>
-    <H sub={`${athletes.length} athletes · ${agCount} agencies`}>Overview</H>
-    <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:28}}>
-      <Kpi label="Total Athletes" val={athletes.length} color={TEAL}/>
-      <Kpi label="Agencies" val={agCount} color={BORD}/>
-      <Kpi label="Negotiating" val={athletes.filter(a=>a.status==="Negotiating").length} color="#B07800"/>
-      <Kpi label="Closed Won" val={athletes.filter(a=>a.status==="Closed Won").length} color="#2A7A50"/>
+    <div style={{background:`linear-gradient(135deg,${NAVY} 0%,#1e1e45 100%)`,borderRadius:16,padding:"32px 36px",marginBottom:28,position:"relative",overflow:"hidden"}}>
+      <div style={{position:"absolute",top:-30,right:-30,width:200,height:200,borderRadius:"50%",background:`${TEAL}15`}}/>
+      <div style={{position:"absolute",bottom:-40,right:80,width:120,height:120,borderRadius:"50%",background:`${BORD}15`}}/>
+      <div style={{fontFamily:"Georgia,serif",color:WHITE,fontSize:28,fontWeight:700,letterSpacing:2,marginBottom:4,position:"relative"}}>ATLAUA CRM</div>
+      <div style={{fontFamily:"sans-serif",color:`${WHITE}88`,fontSize:12,letterSpacing:3,textTransform:"uppercase",position:"relative"}}>God of Water · Athlete Partnership Platform</div>
+      <div style={{display:"flex",gap:32,marginTop:20,position:"relative"}}>
+        {[[athletes.length,"Athletes",TEAL],[agCount,"Agencies",BEIGE],[neg,"Negotiating","#F0C040"],[won,"Closed Won","#4DE8A0"]].map(([v,l,c])=><div key={l}><div style={{fontFamily:"Georgia,serif",fontSize:28,color:c,fontWeight:700,lineHeight:1}}>{v}</div><div style={{fontFamily:"sans-serif",fontSize:10,color:`${WHITE}66`,letterSpacing:2,textTransform:"uppercase",marginTop:2}}>{l}</div></div>)}
+      </div>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:24}}>
+      <Stat label="Total Athletes" val={athletes.length} color={TEAL} icon="🏃"/>
+      <Stat label="Agencies" val={agCount} color={BORD} icon="🏢"/>
+      <Stat label="Negotiating" val={neg} color="#B07800" icon="🤝"/>
+      <Stat label="Closed Won" val={won} color="#2A7A50" icon="✅"/>
     </div>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:18,marginBottom:18}}>
-      <div style={{background:WHITE,borderRadius:10,padding:20,boxShadow:"0 2px 8px rgba(0,0,0,0.05)"}}>
-        <div style={{fontSize:10,fontFamily:"sans-serif",color:BORD,letterSpacing:2,textTransform:"uppercase",marginBottom:14}}>Athletes by League</div>
-        <ResponsiveContainer width="100%" height={190}><PieChart><Pie data={byLeague} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} innerRadius={28} paddingAngle={3}>{byLeague.map((e,i)=><Cell key={i} fill={PCOLS[i%PCOLS.length]}/>)}</Pie><Tooltip/><Legend iconType="circle" iconSize={8} wrapperStyle={{fontSize:11,fontFamily:"sans-serif"}}/></PieChart></ResponsiveContainer>
-      </div>
-      <div style={{background:WHITE,borderRadius:10,padding:20,boxShadow:"0 2px 8px rgba(0,0,0,0.05)"}}>
-        <div style={{fontSize:10,fontFamily:"sans-serif",color:BORD,letterSpacing:2,textTransform:"uppercase",marginBottom:14}}>Pipeline Status</div>
-        <ResponsiveContainer width="100%" height={190}><BarChart data={bySt} layout="vertical" margin={{left:8,right:16}}><XAxis type="number" tick={{fontSize:10}} axisLine={false} tickLine={false}/><YAxis type="category" dataKey="name" width={100} tick={{fontSize:11,fontFamily:"sans-serif"}} axisLine={false} tickLine={false}/><Tooltip/><Bar dataKey="value" fill={TEAL} radius={[0,4,4,0]}/></BarChart></ResponsiveContainer>
-      </div>
+      <Card style={{padding:22}}>
+        <div style={{fontSize:10,fontFamily:"sans-serif",color:BORD,letterSpacing:2,textTransform:"uppercase",marginBottom:16,fontWeight:700}}>Athletes by League</div>
+        <ResponsiveContainer width="100%" height={200}><PieChart><Pie data={byLeague} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75} innerRadius={30} paddingAngle={3}>{byLeague.map((e,i)=><Cell key={i} fill={PCOLS[i%PCOLS.length]}/>)}</Pie><Tooltip/><Legend iconType="circle" iconSize={8} wrapperStyle={{fontSize:11,fontFamily:"sans-serif"}}/></PieChart></ResponsiveContainer>
+      </Card>
+      <Card style={{padding:22}}>
+        <div style={{fontSize:10,fontFamily:"sans-serif",color:BORD,letterSpacing:2,textTransform:"uppercase",marginBottom:16,fontWeight:700}}>Pipeline Status</div>
+        <ResponsiveContainer width="100%" height={200}><BarChart data={bySt} layout="vertical" margin={{left:8,right:16}}><XAxis type="number" tick={{fontSize:10}} axisLine={false} tickLine={false}/><YAxis type="category" dataKey="name" width={100} tick={{fontSize:11,fontFamily:"sans-serif"}} axisLine={false} tickLine={false}/><Tooltip/><Bar dataKey="value" fill={TEAL} radius={[0,5,5,0]}/></BarChart></ResponsiveContainer>
+      </Card>
     </div>
-    <div style={{background:WHITE,borderRadius:10,padding:20,boxShadow:"0 2px 8px rgba(0,0,0,0.05)",marginBottom:18}}>
-      <div style={{fontSize:10,fontFamily:"sans-serif",color:BORD,letterSpacing:2,textTransform:"uppercase",marginBottom:14}}>Top Agencies</div>
-      <ResponsiveContainer width="100%" height={190}><BarChart data={topAg} margin={{bottom:40,left:8,right:8}}><XAxis dataKey="name" tick={{fontSize:10,angle:-25,textAnchor:"end"}} interval={0} height={55} axisLine={false} tickLine={false}/><YAxis tick={{fontSize:10}} axisLine={false} tickLine={false}/><Tooltip/><Bar dataKey="value" fill={BORD} radius={[4,4,0,0]}/></BarChart></ResponsiveContainer>
-    </div>
-    <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-      {LEAGUES.map(l=><div key={l} style={{background:WHITE,borderRadius:8,padding:"12px 18px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",display:"flex",alignItems:"center",gap:10}}>
-        <span style={{fontSize:20}}>{ICONS[l]}</span>
-        <div><div style={{fontSize:9,fontFamily:"sans-serif",color:LGRAY,letterSpacing:2,textTransform:"uppercase"}}>{l}</div><div style={{fontFamily:"Georgia,serif",fontSize:22,color:TEAL,fontWeight:700}}>{athletes.filter(a=>a.league===l).length}</div></div>
-      </div>)}
+    <Card style={{padding:22,marginBottom:18}}>
+      <div style={{fontSize:10,fontFamily:"sans-serif",color:BORD,letterSpacing:2,textTransform:"uppercase",marginBottom:16,fontWeight:700}}>Top Agencies by Roster Size</div>
+      <ResponsiveContainer width="100%" height={200}><BarChart data={topAg} margin={{bottom:40,left:8,right:8}}><XAxis dataKey="name" tick={{fontSize:10,angle:-25,textAnchor:"end"}} interval={0} height={55} axisLine={false} tickLine={false}/><YAxis tick={{fontSize:10}} axisLine={false} tickLine={false}/><Tooltip/><Bar dataKey="value" fill={BORD} radius={[5,5,0,0]}/></BarChart></ResponsiveContainer>
+    </Card>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:12}}>
+      {LEAGUES.map(l=>{const lc={NFL:BORD,NBA:TEAL,NHL:"#4A6FA5",MLB:"#2A7A50",UFC:"#7B4EA6"};return<Card key={l} style={{padding:"16px 18px",borderLeft:`3px solid ${lc[l]}`}}>
+        <div style={{fontSize:22,marginBottom:6}}>{ICONS[l]}</div>
+        <div style={{fontFamily:"Georgia,serif",fontSize:26,color:lc[l],fontWeight:700,lineHeight:1}}>{athletes.filter(a=>a.league===l).length}</div>
+        <div style={{fontFamily:"sans-serif",fontSize:10,color:LGRAY,letterSpacing:2,textTransform:"uppercase",marginTop:4}}>{l}</div>
+      </Card>;})}
     </div>
   </div>;
 }
 
-// ── ATHLETES ──────────────────────────────────────────────────────
+// ── ATHLETES ───────────────────────────────────────────────────────
 function Athletes({athletes,onSelect}) {
   const [q,setQ]=useState(""); const [dq,setDq]=useState(""); const [fL,setFL]=useState(""); const [fS,setFS]=useState(""); const [pg,setPg]=useState(0);
   const PER=50; const ref=useRef();
   useEffect(()=>{clearTimeout(ref.current);ref.current=setTimeout(()=>setDq(q),150);},[q]);
-  const filtered=useMemo(()=>{const lq=dq.toLowerCase();return athletes.filter(a=>(!lq||[a.name,a.agent,a.agency,a.team].some(v=>v.toLowerCase().includes(lq)))&&(!fL||a.league===fL)&&(!fS||a.status===fS));},[athletes,dq,fL,fS]);
+  const filtered=useMemo(()=>{const lq=dq.toLowerCase();return athletes.filter(a=>(!lq||[a.name,a.agent,a.agency,a.team].some(v=>(v||"").toLowerCase().includes(lq)))&&(!fL||a.league===fL)&&(!fS||a.status===fS));},[athletes,dq,fL,fS]);
   const paged=filtered.slice(pg*PER,(pg+1)*PER);
   const pages=Math.ceil(filtered.length/PER);
-  const sel={padding:"8px 12px",borderRadius:6,border:`1.5px solid ${LGRAY}`,fontFamily:"sans-serif",fontSize:13,background:WHITE};
-  const exportIt=()=>{const rows=[["Name","Team","League","Agency","Agent","Email","Status","Updated"],...filtered.map(a=>[a.name,a.team,a.league,a.agency,a.agent,a.email,a.status,a.updated])];const b=new Blob([rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("\n")],{type:"text/csv"});const x=document.createElement("a");x.href=URL.createObjectURL(b);x.download=`atlaua-athletes-${TODAY}.csv`;x.click();};
+  const exportIt=()=>{const rows=[["Name","Team","League","Agency","Agent","Email","Status","Updated"],...filtered.map(a=>[a.name,a.team||"",a.league,a.agency,a.agent,a.email,a.status,a.updated])];const b=new Blob([rows.map(r=>r.map(c=>`"${(c||"").replace(/"/g,'""')}"`).join(",")).join("\n")],{type:"text/csv"});const x=document.createElement("a");x.href=URL.createObjectURL(b);x.download=`atlaua-athletes-${TODAY}.csv`;x.click();};
+  const sel={padding:"9px 12px",borderRadius:8,border:"1.5px solid #EBE7DC",fontFamily:"sans-serif",fontSize:13,background:WHITE,cursor:"pointer"};
   return <div>
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
-      <H sub={`${filtered.length} of ${athletes.length} athletes`}>Athletes</H>
-      <button onClick={exportIt} style={{background:"none",border:`1.5px solid ${BORD}`,color:BORD,borderRadius:6,padding:"7px 16px",cursor:"pointer",fontFamily:"sans-serif",fontWeight:700,fontSize:13}}>↓ Export CSV</button>
-    </div>
-    <div style={{background:WHITE,borderRadius:10,padding:"14px 18px",boxShadow:"0 2px 8px rgba(0,0,0,0.05)",marginBottom:18,display:"flex",gap:10,flexWrap:"wrap"}}>
-      <input value={q} onChange={e=>{setQ(e.target.value);setPg(0)}} placeholder="Search name, agent, agency, team…" style={{flex:"2 1 200px",padding:"9px 14px",borderRadius:6,border:`1.5px solid ${LGRAY}`,fontFamily:"sans-serif",fontSize:14,background:BEIGE}}/>
+    <PageTitle title="Athletes" sub={`${filtered.length} of ${athletes.length} athletes`}>
+      <button onClick={exportIt} style={{background:"none",border:`1.5px solid ${BORD}`,color:BORD,borderRadius:8,padding:"8px 18px",cursor:"pointer",fontFamily:"sans-serif",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",gap:6}}>↓ Export CSV</button>
+    </PageTitle>
+    <Card style={{padding:"14px 18px",marginBottom:18,display:"flex",gap:10,flexWrap:"wrap"}}>
+      <input value={q} onChange={e=>{setQ(e.target.value);setPg(0)}} placeholder="🔍  Search name, agent, agency, team…" style={{flex:"2 1 200px",padding:"9px 14px",borderRadius:8,border:"1.5px solid #EBE7DC",fontFamily:"sans-serif",fontSize:14,background:BEIGE,outline:"none"}}/>
       <select value={fL} onChange={e=>{setFL(e.target.value);setPg(0)}} style={sel}><option value="">All Leagues</option>{LEAGUES.map(l=><option key={l}>{l}</option>)}</select>
       <select value={fS} onChange={e=>{setFS(e.target.value);setPg(0)}} style={sel}><option value="">All Statuses</option>{STATUSES.map(s=><option key={s}>{s}</option>)}</select>
-    </div>
-    <div style={{background:WHITE,borderRadius:10,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,0.05)"}}>
+    </Card>
+    <Card style={{overflow:"hidden"}}>
       <div style={{overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse"}}>
-          <thead><tr style={{background:BEIGE,borderBottom:`2px solid #e8e0cc`}}>
-            {["Athlete","League","Team","Agency","Agent","Status","Updated"].map(h=><th key={h} style={{padding:"11px 15px",textAlign:"left",fontFamily:"sans-serif",fontSize:10,color:BORD,letterSpacing:2,textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>)}
+          <thead><tr style={{background:MGRAY,borderBottom:"2px solid #EBE7DC"}}>
+            {["Athlete","League","Team","Agency","Agent","Status","Updated"].map(h=><th key={h} style={{padding:"12px 16px",textAlign:"left",fontFamily:"sans-serif",fontSize:10,color:BORD,letterSpacing:2,textTransform:"uppercase",whiteSpace:"nowrap",fontWeight:700}}>{h}</th>)}
           </tr></thead>
-          <tbody>{paged.map((a,i)=><tr key={a.id} onClick={()=>onSelect(a)} style={{background:i%2===0?WHITE:"#FDFAF3",cursor:"pointer",borderBottom:`1px solid #f0ede4`,transition:"background 0.1s"}} onMouseEnter={e=>e.currentTarget.style.background="#EEF9F9"} onMouseLeave={e=>e.currentTarget.style.background=i%2===0?WHITE:"#FDFAF3"}>
-            <td style={{padding:"10px 15px",fontFamily:"sans-serif",fontWeight:700,color:DARK,whiteSpace:"nowrap"}}>{a.name}</td>
-            <td style={{padding:"10px 15px"}}><Pill league={a.league}/></td>
-            <td style={{padding:"10px 15px",fontFamily:"sans-serif",fontSize:13,color:DARK}}>{a.team||"—"}</td>
-            <td style={{padding:"10px 15px",fontFamily:"sans-serif",fontSize:13,color:DARK,maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.agency}</td>
-            <td style={{padding:"10px 15px",fontFamily:"sans-serif",fontSize:13,color:LGRAY,maxWidth:130,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.agent}</td>
-            <td style={{padding:"10px 15px"}}><Badge s={a.status}/></td>
-            <td style={{padding:"10px 15px",fontFamily:"sans-serif",fontSize:11,color:LGRAY}}>{a.updated}</td>
+          <tbody>{paged.map((a,i)=><tr key={a.id} onClick={()=>onSelect(a)} style={{background:i%2===0?WHITE:MGRAY,cursor:"pointer",borderBottom:"1px solid #F0EDE4",transition:"background 0.1s"}} onMouseEnter={e=>e.currentTarget.style.background="#EEF9F9"} onMouseLeave={e=>e.currentTarget.style.background=i%2===0?WHITE:MGRAY}>
+            <td style={{padding:"11px 16px",fontFamily:"sans-serif",fontWeight:700,color:DARK,whiteSpace:"nowrap"}}>{a.name}</td>
+            <td style={{padding:"11px 16px"}}><Pill league={a.league}/></td>
+            <td style={{padding:"11px 16px",fontFamily:"sans-serif",fontSize:13,color:DARK}}>{a.team||<span style={{color:LGRAY}}>—</span>}</td>
+            <td style={{padding:"11px 16px",fontFamily:"sans-serif",fontSize:13,color:DARK,maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.agency}</td>
+            <td style={{padding:"11px 16px",fontFamily:"sans-serif",fontSize:13,color:LGRAY,maxWidth:130,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.agent}</td>
+            <td style={{padding:"11px 16px"}}><Badge s={a.status}/></td>
+            <td style={{padding:"11px 16px",fontFamily:"sans-serif",fontSize:11,color:LGRAY}}>{a.updated}</td>
           </tr>)}</tbody>
         </table>
       </div>
-      {pages>1&&<div style={{padding:"12px 16px",borderTop:`1px solid #e8e0cc`,display:"flex",gap:6,justifyContent:"center",background:BEIGE}}>
-        {Array.from({length:pages},(_,i)=><button key={i} onClick={()=>setPg(i)} style={{width:30,height:30,borderRadius:6,border:`1.5px solid ${pg===i?TEAL:LGRAY}`,background:pg===i?TEAL:WHITE,color:pg===i?WHITE:DARK,cursor:"pointer",fontFamily:"sans-serif",fontSize:13}}>{i+1}</button>)}
+      {pages>1&&<div style={{padding:"12px 16px",borderTop:"1px solid #EBE7DC",display:"flex",gap:6,justifyContent:"center",background:MGRAY,flexWrap:"wrap"}}>
+        {Array.from({length:pages},(_,i)=><button key={i} onClick={()=>setPg(i)} style={{minWidth:32,height:32,borderRadius:8,border:`1.5px solid ${pg===i?TEAL:"#EBE7DC"}`,background:pg===i?TEAL:WHITE,color:pg===i?WHITE:DARK,cursor:"pointer",fontFamily:"sans-serif",fontSize:12,fontWeight:pg===i?700:400}}>{i+1}</button>)}
       </div>}
-    </div>
+    </Card>
   </div>;
 }
 
-// ── AGENCIES ──────────────────────────────────────────────────────
+// ── AGENCIES ───────────────────────────────────────────────────────
 function Agencies({athletes,onSelect}) {
   const [q,setQ]=useState(""); const [sort,setSort]=useState("count"); const [exp,setExp]=useState(null);
   const data=useMemo(()=>{
@@ -898,123 +927,278 @@ function Agencies({athletes,onSelect}) {
     return sort==="az"?list.sort((a,b)=>a.name.localeCompare(b.name)):list.sort((a,b)=>b.athletes.length-a.athletes.length);
   },[athletes,q,sort]);
   return <div>
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
-      <H sub={`${data.length} agencies`}>Agencies</H>
-      <select value={sort} onChange={e=>setSort(e.target.value)} style={{padding:"8px 12px",borderRadius:6,border:`1.5px solid ${LGRAY}`,fontFamily:"sans-serif",fontSize:13,background:WHITE}}>
+    <PageTitle title="Agencies" sub={`${data.length} agencies across ${LEAGUES.join(", ")}`}>
+      <select value={sort} onChange={e=>setSort(e.target.value)} style={{padding:"9px 12px",borderRadius:8,border:"1.5px solid #EBE7DC",fontFamily:"sans-serif",fontSize:13,background:WHITE,cursor:"pointer"}}>
         <option value="count">Most Athletes</option><option value="az">A – Z</option>
       </select>
-    </div>
-    <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search agencies…" style={{width:"100%",padding:"9px 14px",borderRadius:6,border:`1.5px solid ${LGRAY}`,fontFamily:"sans-serif",fontSize:14,background:WHITE,marginBottom:18,boxSizing:"border-box"}}/>
-    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
-      {data.map(ag=><div key={ag.name} style={{background:WHITE,borderRadius:10,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,0.05)",borderTop:`3px solid ${TEAL}`}}>
-        <div style={{padding:"16px 18px"}}>
-          <div style={{fontFamily:"Georgia,serif",color:BORD,fontSize:13,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:4,lineHeight:1.3}}>{ag.name}</div>
-          <div style={{fontFamily:"Georgia,serif",color:TEAL,fontSize:30,fontWeight:700,lineHeight:1,marginBottom:8}}>{ag.athletes.length}</div>
-          <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}>{ag.leagues.map(l=><Pill key={l} league={l}/>)}</div>
-          <div style={{fontFamily:"sans-serif",fontSize:12,color:LGRAY,marginBottom:12,lineHeight:1.4}}>{ag.agents.slice(0,2).join(" · ")}{ag.agents.length>2?` +${ag.agents.length-2} more`:""}</div>
-          <button onClick={()=>setExp(exp===ag.name?null:ag.name)} style={{width:"100%",background:"none",border:`1.5px solid ${TEAL}`,color:TEAL,borderRadius:6,padding:"6px 0",cursor:"pointer",fontFamily:"sans-serif",fontWeight:700,fontSize:12}}>
+    </PageTitle>
+    <input value={q} onChange={e=>setQ(e.target.value)} placeholder="🔍  Search agencies…" style={{width:"100%",padding:"10px 16px",borderRadius:8,border:"1.5px solid #EBE7DC",fontFamily:"sans-serif",fontSize:14,background:WHITE,marginBottom:18,boxSizing:"border-box",outline:"none"}}/>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(290px,1fr))",gap:14}}>
+      {data.map(ag=><Card key={ag.name} style={{overflow:"hidden",borderTop:`3px solid ${TEAL}`}}>
+        <div style={{padding:"18px 20px"}}>
+          <div style={{fontFamily:"Georgia,serif",color:NAVY,fontSize:14,fontWeight:700,letterSpacing:.5,marginBottom:4,lineHeight:1.3}}>{ag.name}</div>
+          <div style={{fontFamily:"Georgia,serif",color:TEAL,fontSize:32,fontWeight:700,lineHeight:1,marginBottom:10}}>{ag.athletes.length}</div>
+          <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:10}}>{ag.leagues.map(l=><Pill key={l} league={l}/>)}</div>
+          <div style={{fontFamily:"sans-serif",fontSize:12,color:LGRAY,marginBottom:14,lineHeight:1.5}}>{ag.agents.slice(0,2).join(" · ")}{ag.agents.length>2?` +${ag.agents.length-2} more`:""}</div>
+          <button onClick={()=>setExp(exp===ag.name?null:ag.name)} style={{width:"100%",background:exp===ag.name?"rgba(4,189,183,0.08)":"none",border:`1.5px solid ${TEAL}`,color:TEAL,borderRadius:8,padding:"7px 0",cursor:"pointer",fontFamily:"sans-serif",fontWeight:700,fontSize:12,transition:"all 0.15s"}}>
             {exp===ag.name?"Hide Roster ▲":"View Roster ▼"}
           </button>
         </div>
-        {exp===ag.name&&<div style={{borderTop:`1px solid #e8e0cc`,maxHeight:200,overflowY:"auto",background:BEIGE}}>
-          {ag.athletes.map(a=><div key={a.id} onClick={()=>onSelect(a)} style={{padding:"8px 18px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",borderBottom:`1px solid #f0ede4`,transition:"background 0.1s"}} onMouseEnter={e=>e.currentTarget.style.background="#EEF9F9"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-            <span style={{fontFamily:"sans-serif",fontSize:13,color:DARK,fontWeight:600}}>{ICONS[a.league]||""} {a.name}</span>
+        {exp===ag.name&&<div style={{borderTop:"1px solid #EBE7DC",maxHeight:200,overflowY:"auto",background:MGRAY}}>
+          {ag.athletes.map(a=><div key={a.id} onClick={()=>onSelect(a)} style={{padding:"9px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",borderBottom:"1px solid #EBE7DC",transition:"background 0.1s"}} onMouseEnter={e=>e.currentTarget.style.background="#EEF9F9"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+            <span style={{fontFamily:"sans-serif",fontSize:13,color:DARK,fontWeight:600}}>{a.name}</span>
             <Badge s={a.status}/>
           </div>)}
         </div>}
-      </div>)}
+      </Card>)}
     </div>
   </div>;
 }
 
-// ── TEAMS ─────────────────────────────────────────────────────────
+// ── TEAMS ──────────────────────────────────────────────────────────
 function Teams({athletes,onSelect}) {
   const [lg,setLg]=useState("NFL"); const [open,setOpen]=useState(null);
   const data=useMemo(()=>{const m={};athletes.filter(a=>a.league===lg).forEach(a=>{const t=a.team||"Independent";if(!m[t])m[t]=[];m[t].push(a);});return Object.entries(m).sort((a,b)=>b[1].length-a[1].length);},[athletes,lg]);
+  const lc={NFL:BORD,NBA:TEAL,NHL:"#4A6FA5",MLB:"#2A7A50",UFC:"#7B4EA6"};
   return <div>
-    <H sub="Browse by team">Teams</H>
+    <PageTitle title="Teams" sub="Browse athletes by team"/>
     <div style={{display:"flex",gap:8,marginBottom:22,flexWrap:"wrap"}}>
-      {LEAGUES.map(l=><button key={l} onClick={()=>{setLg(l);setOpen(null)}} style={{padding:"7px 18px",borderRadius:20,border:`1.5px solid ${l===lg?TEAL:LGRAY}`,background:l===lg?TEAL:"transparent",color:l===lg?WHITE:DARK,cursor:"pointer",fontFamily:"sans-serif",fontWeight:l===lg?700:400,fontSize:14,transition:"all 0.15s"}}>{ICONS[l]} {l}</button>)}
+      {LEAGUES.map(l=><button key={l} onClick={()=>{setLg(l);setOpen(null)}} style={{padding:"8px 20px",borderRadius:20,border:`2px solid ${l===lg?lc[l]:"#EBE7DC"}`,background:l===lg?lc[l]:WHITE,color:l===lg?WHITE:DARK,cursor:"pointer",fontFamily:"sans-serif",fontWeight:700,fontSize:14,transition:"all 0.15s"}}>{ICONS[l]} {l}</button>)}
     </div>
     <div style={{display:"flex",flexDirection:"column",gap:8}}>
-      {data.map(([team,aths])=><div key={team} style={{background:WHITE,borderRadius:10,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,0.05)"}}>
-        <div onClick={()=>setOpen(open===team?null:team)} style={{padding:"14px 18px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",background:open===team?BEIGE:WHITE,transition:"background 0.15s"}}>
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <span style={{fontFamily:"Georgia,serif",color:BORD,fontWeight:700,letterSpacing:1}}>{team}</span>
-            <span style={{fontFamily:"sans-serif",fontSize:12,color:LGRAY}}>{aths.length} athletes</span>
+      {data.map(([team,aths])=><Card key={team} style={{overflow:"hidden"}}>
+        <div onClick={()=>setOpen(open===team?null:team)} style={{padding:"15px 20px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",background:open===team?`${lc[lg]}08`:WHITE,transition:"background 0.15s",borderLeft:`3px solid ${open===team?lc[lg]:"transparent"}`}}>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <span style={{fontFamily:"Georgia,serif",color:NAVY,fontWeight:700,fontSize:15}}>{team}</span>
+            <span style={{background:`${lc[lg]}15`,color:lc[lg],fontSize:11,padding:"2px 10px",borderRadius:20,fontFamily:"sans-serif",fontWeight:700}}>{aths.length}</span>
           </div>
-          <span style={{color:TEAL,fontSize:13}}>{open===team?"▲":"▼"}</span>
+          <span style={{color:LGRAY,fontSize:14}}>{open===team?"▲":"▼"}</span>
         </div>
-        {open===team&&<div style={{borderTop:`1px solid #e8e0cc`}}>
-          <div style={{padding:"8px 18px 10px",display:"flex",gap:12,flexWrap:"wrap"}}>
-            {STATUSES.map(s=>{const n=aths.filter(a=>a.status===s).length;return n>0?<span key={s} style={{fontFamily:"sans-serif",fontSize:11,color:LGRAY}}>{s}: <strong style={{color:DARK}}>{n}</strong></span>:null})}
+        {open===team&&<div style={{borderTop:"1px solid #EBE7DC",background:MGRAY}}>
+          <div style={{padding:"10px 20px 8px",display:"flex",gap:14,flexWrap:"wrap",borderBottom:"1px solid #EBE7DC"}}>
+            {STATUSES.map(s=>{const n=aths.filter(a=>a.status===s).length;return n>0?<span key={s} style={{fontFamily:"sans-serif",fontSize:11,color:LGRAY}}>{s}: <strong style={{color:SCOL[s]||DARK}}>{n}</strong></span>:null})}
           </div>
-          {aths.map(a=><div key={a.id} onClick={()=>onSelect(a)} style={{padding:"9px 18px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",borderBottom:`1px solid #f0ede4`,transition:"background 0.1s"}} onMouseEnter={e=>e.currentTarget.style.background=BEIGE} onMouseLeave={e=>e.currentTarget.style.background=WHITE}>
+          {aths.map(a=><div key={a.id} onClick={()=>onSelect(a)} style={{padding:"10px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",borderBottom:"1px solid #EBE7DC",transition:"background 0.1s"}} onMouseEnter={e=>e.currentTarget.style.background="#EEF9F9"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
             <span style={{fontFamily:"sans-serif",fontSize:14,color:DARK,fontWeight:600}}>{a.name}</span>
             <Badge s={a.status}/>
           </div>)}
         </div>}
-      </div>)}
+      </Card>)}
     </div>
   </div>;
 }
 
-// ── PIPELINE ──────────────────────────────────────────────────────
+// ── PIPELINE ───────────────────────────────────────────────────────
 const PCOL_LIST=["Contacted","Negotiating","Proposal Sent","Closed Won","Closed Lost"];
 const PACC={Contacted:BORD,Negotiating:TEAL,"Proposal Sent":"#B07800","Closed Won":"#2A7A50","Closed Lost":"#666"};
-
 function Pipeline({athletes,onUpdate,onSelect}) {
   const [drag,setDrag]=useState(null); const [over,setOver]=useState(null);
   const grouped=useMemo(()=>{const m={};PCOL_LIST.forEach(c=>m[c]=[]);athletes.forEach(a=>{const c=PCOL_LIST.includes(a.status)?a.status:"Contacted";m[c].push(a);});return m;},[athletes]);
   return <div>
-    <H sub="Drag cards to update status">Pipeline</H>
+    <PageTitle title="Pipeline" sub="Drag cards between columns to update status"/>
     <div style={{display:"flex",gap:12,overflowX:"auto",paddingBottom:16,alignItems:"flex-start"}}>
       {PCOL_LIST.map(col=><div key={col} onDragOver={e=>{e.preventDefault();setOver(col)}} onDrop={()=>{if(drag&&drag.status!==col)onUpdate(drag.id,{status:col,updated:TODAY});setDrag(null);setOver(null)}}
-        style={{minWidth:200,flex:"0 0 200px",background:over===col?"rgba(4,189,183,0.05)":BEIGE,borderRadius:10,padding:12,border:`2px solid ${over===col?TEAL:"#e8e0cc"}`,transition:"all 0.15s"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,paddingBottom:8,borderBottom:`2px solid ${PACC[col]}`}}>
-          <span style={{fontFamily:"sans-serif",fontSize:10,color:DARK,textTransform:"uppercase",letterSpacing:2,fontWeight:700}}>{col}</span>
-          <span style={{background:PACC[col],color:WHITE,borderRadius:12,padding:"1px 8px",fontSize:11,fontFamily:"sans-serif",fontWeight:700}}>{(grouped[col]||[]).length}</span>
+        style={{minWidth:210,flex:"0 0 210px",background:over===col?`${PACC[col]}10`:MGRAY,borderRadius:12,padding:12,border:`2px solid ${over===col?PACC[col]:"#EBE7DC"}`,transition:"all 0.15s"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,paddingBottom:10,borderBottom:`3px solid ${PACC[col]}`}}>
+          <span style={{fontFamily:"sans-serif",fontSize:10,color:NAVY,textTransform:"uppercase",letterSpacing:2,fontWeight:700}}>{col}</span>
+          <span style={{background:PACC[col],color:WHITE,borderRadius:12,padding:"2px 9px",fontSize:11,fontFamily:"sans-serif",fontWeight:700}}>{(grouped[col]||[]).length}</span>
         </div>
         {(grouped[col]||[]).map(a=><div key={a.id} draggable onDragStart={()=>setDrag(a)} onDragEnd={()=>{setDrag(null);setOver(null)}} onClick={()=>onSelect(a)}
-          style={{background:WHITE,borderRadius:7,padding:"10px 12px",marginBottom:7,borderLeft:`3px solid ${PACC[col]}`,cursor:"grab",boxShadow:"0 1px 4px rgba(0,0,0,0.07)",opacity:drag?.id===a.id?0.4:1,transition:"opacity 0.1s"}}>
-          <div style={{fontFamily:"sans-serif",fontWeight:700,fontSize:13,color:DARK,marginBottom:2}}>{ICONS[a.league]||""} {a.name}</div>
-          <div style={{fontFamily:"sans-serif",fontSize:11,color:LGRAY,lineHeight:1.3}}>{a.agency.length>28?a.agency.slice(0,28)+"…":a.agency}</div>
-          {a.team&&<div style={{fontFamily:"sans-serif",fontSize:10,color:TEAL,marginTop:3}}>{a.team}</div>}
+          style={{background:WHITE,borderRadius:10,padding:"11px 14px",marginBottom:8,borderLeft:`4px solid ${PACC[col]}`,cursor:"grab",boxShadow:"0 2px 8px rgba(0,0,0,0.08)",opacity:drag?.id===a.id?0.35:1,transition:"opacity 0.1s"}}>
+          <div style={{fontFamily:"sans-serif",fontWeight:700,fontSize:13,color:DARK,marginBottom:3}}>{a.name}</div>
+          <div style={{fontFamily:"sans-serif",fontSize:11,color:LGRAY,lineHeight:1.4}}>{a.agency.length>30?a.agency.slice(0,30)+"…":a.agency}</div>
+          {a.team&&<div style={{fontFamily:"sans-serif",fontSize:10,color:TEAL,marginTop:4,fontWeight:600}}>{a.team}</div>}
         </div>)}
       </div>)}
     </div>
   </div>;
 }
 
-// ── CONTACTS ──────────────────────────────────────────────────────
+// ── CONTACTS (grouped by category) ────────────────────────────────
 function Contacts({contacts}) {
-  const CC={Distributor:TEAL,Brand:BORD,Media:DARK,Partner:"#4A6FA5",Other:LGRAY};
+  const [open,setOpen]=useState(null);
+  const cats=["Distributor","Brand","Media","Partner","Other"];
+  const grouped=useMemo(()=>{const m={};cats.forEach(c=>m[c]=[]);contacts.forEach(c=>{const cat=cats.includes(c.category)?c.category:"Other";m[cat].push(c);});return m;},[contacts]);
   return <div>
-    <H sub="Distributors, brands, media, partners">Contacts</H>
-    {!contacts.length?<div style={{background:WHITE,borderRadius:10,padding:60,textAlign:"center",boxShadow:"0 2px 8px rgba(0,0,0,0.05)"}}>
-      <div style={{fontSize:40,marginBottom:12}}>📋</div>
-      <div style={{fontFamily:"Georgia,serif",color:BORD,fontSize:16,letterSpacing:2,marginBottom:8}}>NO CONTACTS YET</div>
+    <PageTitle title="Contacts" sub="Grouped by category · Distributors, Brands, Media, Partners"/>
+    {!contacts.length?<Card style={{padding:60,textAlign:"center"}}>
+      <div style={{fontSize:48,marginBottom:14}}>📋</div>
+      <div style={{fontFamily:"Georgia,serif",color:BORD,fontSize:18,letterSpacing:2,marginBottom:8}}>NO CONTACTS YET</div>
       <div style={{fontFamily:"sans-serif",color:LGRAY,fontSize:14}}>Use the + button below to add distributors, brands, media, and partners.</div>
-    </div>:<div style={{background:WHITE,borderRadius:10,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,0.05)"}}>
-      <table style={{width:"100%",borderCollapse:"collapse"}}>
-        <thead><tr style={{background:BEIGE}}>
-          {["Name","Company","Category","Email","Phone","Added"].map(h=><th key={h} style={{padding:"11px 15px",textAlign:"left",fontFamily:"sans-serif",fontSize:10,color:BORD,letterSpacing:2,textTransform:"uppercase"}}>{h}</th>)}
-        </tr></thead>
-        <tbody>{contacts.map((c,i)=><tr key={c.id} style={{background:i%2===0?WHITE:"#FDFAF3",borderBottom:`1px solid #f0ede4`}}>
-          <td style={{padding:"10px 15px",fontFamily:"sans-serif",fontWeight:700,color:DARK}}>{c.name}</td>
-          <td style={{padding:"10px 15px",fontFamily:"sans-serif",fontSize:13,color:DARK}}>{c.company}</td>
-          <td style={{padding:"10px 15px"}}><span style={{background:CC[c.category]||LGRAY,color:WHITE,fontSize:10,padding:"2px 10px",borderRadius:20,fontFamily:"sans-serif"}}>{c.category}</span></td>
-          <td style={{padding:"10px 15px"}}><a href={`mailto:${c.email}`} style={{color:TEAL,fontFamily:"sans-serif",fontSize:13,textDecoration:"none"}}>{c.email}</a></td>
-          <td style={{padding:"10px 15px",fontFamily:"sans-serif",fontSize:13,color:DARK}}>{c.phone}</td>
-          <td style={{padding:"10px 15px",fontFamily:"sans-serif",fontSize:11,color:LGRAY}}>{c.updated}</td>
-        </tr>)}</tbody>
-      </table>
+    </Card>:<div style={{display:"flex",flexDirection:"column",gap:14}}>
+      {cats.map(cat=>{
+        const list=grouped[cat]||[];
+        const isOpen=open===cat;
+        if(!list.length) return null;
+        return <Card key={cat} style={{overflow:"hidden",borderLeft:`4px solid ${CAT_COL[cat]}`}}>
+          <div onClick={()=>setOpen(isOpen?null:cat)} style={{padding:"16px 22px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",background:isOpen?`${CAT_COL[cat]}08`:WHITE,transition:"background 0.15s"}}>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <span style={{fontSize:20}}>{CAT_ICON[cat]}</span>
+              <div>
+                <div style={{fontFamily:"Georgia,serif",color:NAVY,fontWeight:700,fontSize:16}}>{cat}s</div>
+                <div style={{fontFamily:"sans-serif",color:LGRAY,fontSize:12,marginTop:2}}>{list.length} contact{list.length!==1?"s":""}</div>
+              </div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <span style={{background:`${CAT_COL[cat]}15`,color:CAT_COL[cat],fontSize:13,padding:"3px 12px",borderRadius:20,fontFamily:"sans-serif",fontWeight:700}}>{list.length}</span>
+              <span style={{color:LGRAY,fontSize:14}}>{isOpen?"▲":"▼"}</span>
+            </div>
+          </div>
+          {isOpen&&<div style={{borderTop:"1px solid #EBE7DC",background:MGRAY}}>
+            <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <thead><tr style={{borderBottom:"1px solid #EBE7DC"}}>
+                {["Name","Company","Email","Phone","Added"].map(h=><th key={h} style={{padding:"10px 16px",textAlign:"left",fontFamily:"sans-serif",fontSize:10,color:BORD,letterSpacing:2,textTransform:"uppercase",fontWeight:700}}>{h}</th>)}
+              </tr></thead>
+              <tbody>{list.map((c,i)=><tr key={c.id} style={{background:i%2===0?WHITE:"#F9F6EE",borderBottom:"1px solid #EBE7DC"}}>
+                <td style={{padding:"10px 16px",fontFamily:"sans-serif",fontWeight:700,color:DARK}}>{c.name}</td>
+                <td style={{padding:"10px 16px",fontFamily:"sans-serif",fontSize:13,color:DARK}}>{c.company}</td>
+                <td style={{padding:"10px 16px"}}>{c.email?<a href={`mailto:${c.email}`} style={{color:TEAL,fontFamily:"sans-serif",fontSize:13,textDecoration:"none"}}>{c.email}</a>:<span style={{color:LGRAY}}>—</span>}</td>
+                <td style={{padding:"10px 16px",fontFamily:"sans-serif",fontSize:13,color:DARK}}>{c.phone||<span style={{color:LGRAY}}>—</span>}</td>
+                <td style={{padding:"10px 16px",fontFamily:"sans-serif",fontSize:11,color:LGRAY}}>{c.updated}</td>
+              </tr>)}</tbody>
+            </table>
+          </div>}
+        </Card>;
+      })}
     </div>}
   </div>;
 }
 
-// ── SHELL ─────────────────────────────────────────────────────────
-const NAV=[{id:"Dashboard",ic:"◈"},{id:"Athletes",ic:"◉"},{id:"Agencies",ic:"◎"},{id:"Teams",ic:"◍"},{id:"Pipeline",ic:"▤"},{id:"Contacts",ic:"◫"}];
+// ── EXPORT ─────────────────────────────────────────────────────────
+function Export({athletes,contacts}) {
+  const [type,setType]=useState("athletes");
+  const [fL,setFL]=useState("");
+  const [fS,setFS]=useState("");
+  const [fCat,setFCat]=useState("");
+  const [exported,setExported]=useState(false);
+
+  const filteredAthletes=useMemo(()=>athletes.filter(a=>(!fL||a.league===fL)&&(!fS||a.status===fS)),[athletes,fL,fS]);
+  const filteredContacts=useMemo(()=>contacts.filter(c=>!fCat||c.category===fCat),[contacts,fCat]);
+  const preview=type==="athletes"?filteredAthletes.slice(0,5):filteredContacts.slice(0,5);
+  const totalRows=type==="athletes"?filteredAthletes.length:filteredContacts.length;
+
+  const doExport=()=>{
+    let rows, filename;
+    if(type==="athletes"){
+      rows=[["Name","Team","League","Agency","Agent","Email","Status","Last Updated"],...filteredAthletes.map(a=>[a.name,a.team||"",a.league,a.agency,a.agent,a.email,a.status,a.updated])];
+      filename=`atlaua-athletes-${TODAY}.csv`;
+    } else {
+      rows=[["Name","Company","Category","Email","Phone","Date Added"],...filteredContacts.map(c=>[c.name,c.company||"",c.category,c.email||"",c.phone||"",c.updated])];
+      filename=`atlaua-contacts-${TODAY}.csv`;
+    }
+    const csv=rows.map(r=>r.map(v=>`"${(v||"").replace(/"/g,'""')}"`).join(",")).join("\n");
+    const b=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+    const x=document.createElement("a");x.href=URL.createObjectURL(b);x.download=filename;x.click();
+    setExported(true);setTimeout(()=>setExported(false),3000);
+  };
+
+  const doExportBoth=()=>{
+    const aRows=[["Type","Name","Team/Company","League/Category","Agency","Agent/Contact","Email","Status/Phone","Last Updated"],...athletes.map(a=>["Athlete",a.name,a.team||"",a.league,a.agency,a.agent,a.email,a.status,a.updated]),...contacts.map(c=>["Contact",c.name,c.company||"",c.category,"","",c.email||"",c.phone||"",c.updated])];
+    const csv=aRows.map(r=>r.map(v=>`"${(v||"").replace(/"/g,'""')}"`).join(",")).join("\n");
+    const b=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+    const x=document.createElement("a");x.href=URL.createObjectURL(b);x.download=`atlaua-full-export-${TODAY}.csv`;x.click();
+    setExported(true);setTimeout(()=>setExported(false),3000);
+  };
+
+  const athCols=["Name","Team","League","Agency","Agent","Email","Status","Updated"];
+  const conCols=["Name","Company","Category","Email","Phone","Added"];
+  const cols=type==="athletes"?athCols:conCols;
+
+  return <div>
+    <PageTitle title="Export" sub="Download your CRM data as CSV"/>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:18,marginBottom:24}}>
+      <Card style={{padding:22}}>
+        <div style={{fontSize:10,fontFamily:"sans-serif",color:BORD,letterSpacing:2,textTransform:"uppercase",marginBottom:16,fontWeight:700}}>Export Type</div>
+        <div style={{display:"flex",gap:10,marginBottom:16}}>
+          {["athletes","contacts"].map(t=><button key={t} onClick={()=>{setType(t);setFL("");setFS("");setFCat("");}} style={{flex:1,padding:"12px 0",borderRadius:10,border:`2px solid ${type===t?TEAL:"#EBE7DC"}`,background:type===t?`${TEAL}15`:WHITE,color:type===t?TEAL:DARK,cursor:"pointer",fontFamily:"sans-serif",fontWeight:700,fontSize:14,transition:"all 0.15s"}}>
+            {t==="athletes"?"🏃 Athletes":"👤 Contacts"}
+          </button>)}
+        </div>
+        {type==="athletes"?<div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div>
+            <div style={{fontSize:10,fontFamily:"sans-serif",color:BORD,letterSpacing:2,textTransform:"uppercase",marginBottom:6,fontWeight:700}}>Filter by League</div>
+            <select value={fL} onChange={e=>setFL(e.target.value)} style={{width:"100%",padding:"9px 12px",borderRadius:8,border:"1.5px solid #EBE7DC",fontFamily:"sans-serif",fontSize:13,background:WHITE,cursor:"pointer"}}>
+              <option value="">All Leagues</option>
+              {LEAGUES.map(l=><option key={l}>{l}</option>)}
+            </select>
+          </div>
+          <div>
+            <div style={{fontSize:10,fontFamily:"sans-serif",color:BORD,letterSpacing:2,textTransform:"uppercase",marginBottom:6,fontWeight:700}}>Filter by Status</div>
+            <select value={fS} onChange={e=>setFS(e.target.value)} style={{width:"100%",padding:"9px 12px",borderRadius:8,border:"1.5px solid #EBE7DC",fontFamily:"sans-serif",fontSize:13,background:WHITE,cursor:"pointer"}}>
+              <option value="">All Statuses</option>
+              {STATUSES.map(s=><option key={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>:<div>
+          <div style={{fontSize:10,fontFamily:"sans-serif",color:BORD,letterSpacing:2,textTransform:"uppercase",marginBottom:6,fontWeight:700}}>Filter by Category</div>
+          <select value={fCat} onChange={e=>setFCat(e.target.value)} style={{width:"100%",padding:"9px 12px",borderRadius:8,border:"1.5px solid #EBE7DC",fontFamily:"sans-serif",fontSize:13,background:WHITE,cursor:"pointer"}}>
+            <option value="">All Categories</option>
+            {["Distributor","Brand","Media","Partner","Other"].map(c=><option key={c}>{c}</option>)}
+          </select>
+        </div>}
+      </Card>
+      <Card style={{padding:22,display:"flex",flexDirection:"column",justifyContent:"space-between"}}>
+        <div>
+          <div style={{fontSize:10,fontFamily:"sans-serif",color:BORD,letterSpacing:2,textTransform:"uppercase",marginBottom:16,fontWeight:700}}>Export Summary</div>
+          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:20}}>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"10px 14px",background:MGRAY,borderRadius:8}}>
+              <span style={{fontFamily:"sans-serif",fontSize:13,color:DARK}}>Records to export</span>
+              <span style={{fontFamily:"Georgia,serif",fontSize:18,color:TEAL,fontWeight:700}}>{totalRows}</span>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"10px 14px",background:MGRAY,borderRadius:8}}>
+              <span style={{fontFamily:"sans-serif",fontSize:13,color:DARK}}>Fields included</span>
+              <span style={{fontFamily:"sans-serif",fontSize:13,color:DARK,fontWeight:700}}>{cols.length}</span>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"10px 14px",background:MGRAY,borderRadius:8}}>
+              <span style={{fontFamily:"sans-serif",fontSize:13,color:DARK}}>Format</span>
+              <span style={{fontFamily:"sans-serif",fontSize:13,color:DARK,fontWeight:700}}>CSV (UTF-8)</span>
+            </div>
+          </div>
+          <div style={{fontSize:10,fontFamily:"sans-serif",color:LGRAY,letterSpacing:1,marginBottom:8}}>COLUMNS: {cols.join(", ")}</div>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <button onClick={doExport} style={{background:exported?`linear-gradient(135deg,#2A7A50,#1d5c3a)`:`linear-gradient(135deg,${TEAL},#02a5a0)`,color:WHITE,border:"none",borderRadius:10,padding:"14px",fontFamily:"sans-serif",fontWeight:700,fontSize:15,cursor:"pointer",boxShadow:`0 4px 16px ${TEAL}44`,letterSpacing:.5,transition:"all 0.3s"}}>
+            {exported?"✓ Downloaded!":"↓ Export CSV"}
+          </button>
+          <button onClick={doExportBoth} style={{background:"none",border:`2px solid ${BORD}`,color:BORD,borderRadius:10,padding:"11px",fontFamily:"sans-serif",fontWeight:700,fontSize:13,cursor:"pointer",transition:"all 0.15s"}} onMouseEnter={e=>e.currentTarget.style.background=`${BORD}08`} onMouseLeave={e=>e.currentTarget.style.background="none"}>
+            ↓ Export Everything (Athletes + Contacts)
+          </button>
+        </div>
+      </Card>
+    </div>
+    <Card style={{overflow:"hidden"}}>
+      <div style={{padding:"14px 20px",borderBottom:"1px solid #EBE7DC",display:"flex",alignItems:"center",gap:8}}>
+        <div style={{fontSize:10,fontFamily:"sans-serif",color:BORD,letterSpacing:2,textTransform:"uppercase",fontWeight:700}}>Data Preview</div>
+        <span style={{background:`${TEAL}15`,color:TEAL,fontSize:11,padding:"2px 10px",borderRadius:20,fontFamily:"sans-serif",fontWeight:700}}>First 5 rows</span>
+      </div>
+      <div style={{overflowX:"auto"}}>
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead><tr style={{background:MGRAY}}>
+            {cols.map(h=><th key={h} style={{padding:"10px 14px",textAlign:"left",fontFamily:"sans-serif",fontSize:10,color:BORD,letterSpacing:2,textTransform:"uppercase",whiteSpace:"nowrap",fontWeight:700}}>{h}</th>)}
+          </tr></thead>
+          <tbody>
+            {preview.length===0?<tr><td colSpan={cols.length} style={{padding:"30px",textAlign:"center",fontFamily:"sans-serif",color:LGRAY,fontSize:14}}>No data to preview with current filters.</td></tr>:
+            preview.map((row,i)=><tr key={i} style={{background:i%2===0?WHITE:MGRAY,borderBottom:"1px solid #EBE7DC"}}>
+              {type==="athletes"?[row.name,row.team||"—",row.league,row.agency,row.agent,row.email,row.status,row.updated].map((v,j)=><td key={j} style={{padding:"9px 14px",fontFamily:"sans-serif",fontSize:12,color:DARK,maxWidth:150,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v}</td>):
+              [row.name,row.company||"—",row.category,row.email||"—",row.phone||"—",row.updated].map((v,j)=><td key={j} style={{padding:"9px 14px",fontFamily:"sans-serif",fontSize:12,color:DARK,maxWidth:150,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v}</td>)}
+            </tr>)}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  </div>;
+}
+
+// ── APP SHELL ──────────────────────────────────────────────────────
+const NAV=[
+  {id:"Dashboard",ic:"⬡",label:"Dashboard"},
+  {id:"Athletes",ic:"◉",label:"Athletes"},
+  {id:"Agencies",ic:"◎",label:"Agencies"},
+  {id:"Teams",ic:"◍",label:"Teams"},
+  {id:"Pipeline",ic:"▤",label:"Pipeline"},
+  {id:"Contacts",ic:"◫",label:"Contacts"},
+  {id:"Export",ic:"↓",label:"Export"},
+];
 
 export default function App() {
   const [athletes,setAthletes]=useState([]);
@@ -1031,70 +1215,76 @@ export default function App() {
         supabase.from("athletes").select("*").order("id"),
         supabase.from("contacts").select("*").order("id")
       ]);
-      if(ath) setAthletes(ath);
-      if(con) setContacts(con);
+      if(ath)setAthletes(ath);
+      if(con)setContacts(con);
       setLoading(false);
     }
     loadData();
   },[]);
 
-  const upd=useCallback(async (id,u)=>{
+  const upd=useCallback(async(id,u)=>{
     setAthletes(p=>p.map(a=>a.id===id?{...a,...u}:a));
     setSel(p=>p?.id===id?{...p,...u}:p);
     await supabase.from("athletes").update(u).eq("id",id);
   },[]);
 
-  const addNew=async (item,type)=>{
+  const addNew=async(item,type)=>{
     if(type==="contact"){
       const {data}=await supabase.from("contacts").insert([item]).select();
-      if(data) setContacts(p=>[...p,data[0]]);
+      if(data)setContacts(p=>[...p,data[0]]);
     } else {
       const {data}=await supabase.from("athletes").insert([item]).select();
-      if(data) setAthletes(p=>[...p,data[0]]);
+      if(data)setAthletes(p=>[...p,data[0]]);
     }
   };
 
-  if(loading) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:BEIGE,fontFamily:"sans-serif",color:TEAL,fontSize:18,letterSpacing:2}}>Loading...</div>;
+  if(loading) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:NAVY,fontFamily:"Georgia,serif",color:TEAL,fontSize:24,letterSpacing:4,flexDirection:"column",gap:16}}>
+    <div style={{fontSize:36,letterSpacing:8}}>ATLAUA</div>
+    <div style={{fontFamily:"sans-serif",fontSize:11,letterSpacing:4,color:`${WHITE}44`,textTransform:"uppercase"}}>Loading…</div>
+  </div>;
+
+  const agCount=new Set(athletes.map(a=>a.agency).filter(Boolean)).size;
 
   return (
-    <div style={{display:"flex",height:"100vh",background:BEIGE,overflow:"hidden",fontFamily:"sans-serif"}}>
+    <div style={{display:"flex",height:"100vh",background:MGRAY,overflow:"hidden"}}>
       {/* SIDEBAR */}
-      <aside style={{width:218,background:WHITE,borderRight:`1px solid #e8e0cc`,display:"flex",flexDirection:"column",flexShrink:0,boxShadow:"2px 0 10px rgba(0,0,0,0.04)"}}>
-        <div style={{padding:"26px 22px 22px",borderBottom:`1px solid #e8e0cc`}}>
-          <div style={{fontFamily:"Georgia,serif",fontWeight:700,letterSpacing:3,color:BORD,fontSize:15,lineHeight:1}}>ATLAUA</div>
-          <div style={{fontFamily:"sans-serif",color:TEAL,fontSize:9,letterSpacing:3,marginTop:5,textTransform:"uppercase"}}>GOD OF WATER</div>
-          <div style={{marginTop:12,height:1,background:`linear-gradient(to right,${TEAL},transparent)`}}/>
+      <aside style={{width:230,background:NAVY,display:"flex",flexDirection:"column",flexShrink:0}}>
+        <div style={{padding:"28px 24px 22px"}}>
+          <div style={{fontFamily:"Georgia,serif",fontWeight:700,letterSpacing:4,color:WHITE,fontSize:16,lineHeight:1}}>ATLAUA</div>
+          <div style={{fontFamily:"sans-serif",color:TEAL,fontSize:9,letterSpacing:4,marginTop:6,textTransform:"uppercase",opacity:.8}}>GOD OF WATER</div>
+          <div style={{marginTop:14,height:1,background:`linear-gradient(to right,${TEAL}88,transparent)`}}/>
         </div>
-        <nav style={{flex:1,padding:"10px 10px"}}>
-          {NAV.map(({id,ic})=>{
+        <nav style={{flex:1,padding:"8px 12px"}}>
+          {NAV.map(({id,ic,label})=>{
             const on=page===id;
-            return <div key={id} onClick={()=>setPage(id)} style={{display:"flex",alignItems:"center",gap:9,padding:"10px 11px",borderRadius:7,cursor:"pointer",marginBottom:2,background:on?"rgba(4,189,183,0.1)":"transparent",transition:"all 0.15s"}} onMouseEnter={e=>{if(!on)e.currentTarget.style.background="rgba(4,189,183,0.05)"}} onMouseLeave={e=>{if(!on)e.currentTarget.style.background="transparent"}}>
-              <span style={{fontSize:13,color:on?TEAL:LGRAY}}>{ic}</span>
-              <span style={{fontFamily:"sans-serif",fontSize:14,fontWeight:on?700:400,color:on?TEAL:BORD}}>{id}</span>
-              {on&&<div style={{marginLeft:"auto",width:3,height:14,background:TEAL,borderRadius:2}}/>}
+            return <div key={id} onClick={()=>setPage(id)} style={{display:"flex",alignItems:"center",gap:10,padding:"11px 12px",borderRadius:8,cursor:"pointer",marginBottom:2,background:on?`${TEAL}20`:"transparent",transition:"all 0.15s",borderLeft:`3px solid ${on?TEAL:"transparent"}`}} onMouseEnter={e=>{if(!on)e.currentTarget.style.background=`${WHITE}08`}} onMouseLeave={e=>{if(!on)e.currentTarget.style.background="transparent"}}>
+              <span style={{fontSize:13,color:on?TEAL:`${WHITE}55`,width:16,textAlign:"center"}}>{ic}</span>
+              <span style={{fontFamily:"sans-serif",fontSize:13,fontWeight:on?700:400,color:on?WHITE:`${WHITE}66`,letterSpacing:.3}}>{label}</span>
+              {on&&<div style={{marginLeft:"auto",width:4,height:4,borderRadius:"50%",background:TEAL}}/>}
             </div>;
           })}
         </nav>
-        <div style={{padding:"14px 22px",borderTop:`1px solid #e8e0cc`}}>
-          <div style={{fontFamily:"sans-serif",fontSize:9,color:LGRAY,letterSpacing:2,textTransform:"uppercase"}}>{athletes.length} Athletes</div>
-          <div style={{fontFamily:"sans-serif",fontSize:9,color:LGRAY,letterSpacing:2,textTransform:"uppercase",marginTop:2}}>{new Set(athletes.map(a=>a.agency).filter(Boolean)).size} Agencies</div>
+        <div style={{padding:"16px 24px",borderTop:`1px solid ${WHITE}12`}}>
+          <div style={{fontFamily:"sans-serif",fontSize:10,color:`${WHITE}44`,letterSpacing:2,textTransform:"uppercase",marginBottom:6}}>{athletes.length} Athletes · {agCount} Agencies</div>
+          <div style={{fontFamily:"sans-serif",fontSize:10,color:`${WHITE}30`,letterSpacing:1}}>ATLAUA CRM v2.0</div>
         </div>
       </aside>
 
       {/* MAIN */}
-      <main style={{flex:1,overflowY:"auto",padding:"34px 38px"}}>
-        <div style={{maxWidth:1100,margin:"0 auto"}}>
-          {page==="Dashboard"&&<Dashboard athletes={athletes}/>}
+      <main style={{flex:1,overflowY:"auto",padding:"32px 38px"}}>
+        <div style={{maxWidth:1120,margin:"0 auto"}}>
+          {page==="Dashboard"&&<Dashboard athletes={athletes} contacts={contacts}/>}
           {page==="Athletes"&&<Athletes athletes={athletes} onSelect={setSel}/>}
           {page==="Agencies"&&<Agencies athletes={athletes} onSelect={setSel}/>}
           {page==="Teams"&&<Teams athletes={athletes} onSelect={setSel}/>}
           {page==="Pipeline"&&<Pipeline athletes={athletes} onUpdate={upd} onSelect={setSel}/>}
           {page==="Contacts"&&<Contacts contacts={contacts}/>}
+          {page==="Export"&&<Export athletes={athletes} contacts={contacts}/>}
         </div>
       </main>
 
       {/* FAB */}
-      <button onClick={()=>setShowAdd(true)} style={{position:"fixed",bottom:30,right:30,width:52,height:52,borderRadius:"50%",background:TEAL,color:WHITE,border:"none",fontSize:28,cursor:"pointer",boxShadow:"0 4px 20px rgba(4,189,183,0.45)",zIndex:50,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:300,lineHeight:1,transition:"transform 0.15s"}} onMouseEnter={e=>e.currentTarget.style.transform="scale(1.1)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>+</button>
+      <button onClick={()=>setShowAdd(true)} style={{position:"fixed",bottom:32,right:32,width:54,height:54,borderRadius:"50%",background:`linear-gradient(135deg,${TEAL},#02a5a0)`,color:WHITE,border:"none",fontSize:28,cursor:"pointer",boxShadow:`0 6px 24px ${TEAL}55`,zIndex:50,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:300,lineHeight:1,transition:"transform 0.2s,box-shadow 0.2s"}} onMouseEnter={e=>{e.currentTarget.style.transform="scale(1.12)";e.currentTarget.style.boxShadow=`0 10px 32px ${TEAL}66`;}} onMouseLeave={e=>{e.currentTarget.style.transform="scale(1)";e.currentTarget.style.boxShadow=`0 6px 24px ${TEAL}55`;}}>+</button>
 
       {sel&&<Panel a={sel} onClose={()=>setSel(null)} onSave={upd}/>}
       {showAdd&&<AddModal athletes={athletes} onClose={()=>setShowAdd(false)} onAdd={addNew}/>}
