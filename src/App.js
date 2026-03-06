@@ -1106,7 +1106,7 @@ function GmailConnectModal({ onClose, onImport }) {
     try {
       await loadGSI();
       if (GOOGLE_CLIENT_ID === "YOUR_GOOGLE_CLIENT_ID") {
-        setError("⚠️ Set REACT_APP_GOOGLE_CLIENT_ID in your .env file (see README).");
+        setError("Set REACT_APP_GOOGLE_CLIENT_ID in your .env file. Get one at console.cloud.google.com → APIs & Services → Credentials → OAuth 2.0 Client ID.");
         setStep(0); return;
       }
       const tokenClient = window.google.accounts.oauth2.initTokenClient({
@@ -1128,46 +1128,56 @@ function GmailConnectModal({ onClose, onImport }) {
   const fetchContacts = async (accessToken) => {
     setProgress(5);
     try {
-      // 1. Fetch list of sent message IDs
-      const listRes = await fetch(
-        "https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=SENT&maxResults=200&q=in:sent",
-        { headers:{ Authorization:`Bearer ${accessToken}` } }
-      );
-      if (!listRes.ok) throw new Error(`Gmail API error: ${listRes.status}`);
-      const listData = await listRes.json();
-      const messages = listData.messages || [];
+      // 1. Fetch ALL sent message IDs with pagination
+      let messages = [];
+      let pageToken = null;
+      let page = 0;
+      do {
+        const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=SENT&maxResults=500${pageToken ? `&pageToken=${pageToken}` : ""}`;
+        const listRes = await fetch(url, { headers:{ Authorization:`Bearer ${accessToken}` } });
+        if (!listRes.ok) throw new Error(`Gmail API error: ${listRes.status}`);
+        const listData = await listRes.json();
+        messages = messages.concat(listData.messages || []);
+        pageToken = listData.nextPageToken || null;
+        page++;
+        setProgress(Math.min(10, page * 3));
+      } while (pageToken && messages.length < 5000);
       setProgress(15);
 
       // 2. Fetch headers in batches
       const contactMap = new Map();
-      const batchSize  = 25;
-      for (let i = 0; i < Math.min(messages.length, 200); i += batchSize) {
+      const batchSize  = 30;
+      const total = messages.length;
+      for (let i = 0; i < total; i += batchSize) {
         const batch = messages.slice(i, i + batchSize);
         await Promise.all(batch.map(async msg => {
-          const r = await fetch(
-            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=To&metadataHeaders=Cc`,
-            { headers:{ Authorization:`Bearer ${accessToken}` } }
-          );
-          const data = await r.json();
-          const headers = data.payload?.headers || [];
-          ["To","Cc"].forEach(hName => {
-            const h = headers.find(x=>x.name===hName);
-            if (!h) return;
-            parseEmailAddresses(h.value).forEach(({name, email}) => {
-              if (!contactMap.has(email)) {
-                contactMap.set(email, {
-                  name, email,
-                  category: categorizeEmail(email),
-                  source:"Gmail History",
-                  count:1
-                });
-              } else {
-                contactMap.get(email).count++;
-              }
+          try {
+            const r = await fetch(
+              `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=To&metadataHeaders=Cc`,
+              { headers:{ Authorization:`Bearer ${accessToken}` } }
+            );
+            if (!r.ok) return;
+            const data = await r.json();
+            const headers = data.payload?.headers || [];
+            ["To","Cc"].forEach(hName => {
+              const h = headers.find(x=>x.name===hName);
+              if (!h) return;
+              parseEmailAddresses(h.value).forEach(({name, email}) => {
+                if (!contactMap.has(email)) {
+                  contactMap.set(email, {
+                    name, email,
+                    category: categorizeEmail(email),
+                    source:"Gmail History",
+                    count:1
+                  });
+                } else {
+                  contactMap.get(email).count++;
+                }
+              });
             });
-          });
+          } catch(_) {}
         }));
-        setProgress(15 + Math.round((i/Math.min(messages.length,200))*80));
+        setProgress(15 + Math.round((i/total)*80));
       }
 
       const all = Array.from(contactMap.values()).sort((a,b)=>b.count-a.count);
@@ -1216,7 +1226,7 @@ function GmailConnectModal({ onClose, onImport }) {
 
         {/* Security badge */}
         <div style={{ display:"flex", gap:8, marginBottom:20, flexWrap:"wrap" }}>
-          {["🔒 OAuth 2.0","📖 Read-only scope","🚫 No data stored on servers","⚡ In-memory only"].map(b=>(
+          {["OAuth 2.0","Read-only scope","No data stored on servers","In-memory only"].map(b=>(
             <span key={b} style={{ background:GREEN+"18", border:`1px solid ${GREEN}33`, color:GREEN,
               borderRadius:20, padding:"3px 10px", fontSize:11, fontWeight:600 }}>{b}</span>
           ))}
@@ -1259,7 +1269,7 @@ function GmailConnectModal({ onClose, onImport }) {
         {/* Step 1: Loading */}
         {step===1 && (
           <div style={{ textAlign:"center", padding:"32px 0" }}>
-            <div style={{ fontSize:40, marginBottom:20 }}>📡</div>
+            <div style={{ marginBottom:20 }}>{NavIcons.Gmail}</div>
             <div style={{ color:TX1, fontWeight:700, fontSize:16, marginBottom:8 }}>Scanning your Gmail history...</div>
             <div style={{ color:TX2, fontSize:13, marginBottom:20 }}>Reading sent email headers only</div>
             <div style={{ background:C3, borderRadius:8, height:8, overflow:"hidden" }}>
@@ -1325,7 +1335,7 @@ function GmailConnectModal({ onClose, onImport }) {
         {/* Step 3: Done */}
         {step===3 && (
           <div style={{ textAlign:"center", padding:"20px 0" }}>
-            <div style={{ fontSize:52, marginBottom:16 }}>🎉</div>
+            <div style={{ width:52, height:52, borderRadius:"50%", background:GREEN+"22", border:`2px solid ${GREEN}44`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px" }}><svg width="28" height="28" fill="none" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4" stroke={GREEN} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg></div>
             <div style={{ color:TX1, fontSize:20, fontWeight:700, marginBottom:8 }}>Contacts imported!</div>
             <div style={{ color:TX2, fontSize:14 }}>Your Gmail contacts are now in the CRM</div>
             <div style={{ marginTop:24 }}>
