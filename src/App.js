@@ -1568,7 +1568,7 @@ function Dashboard({ athletes }) {
           borderRadius:"50%", background:WINE, opacity:0.06, pointerEvents:"none" }}/>
         <div style={{ color:TX3, fontSize:12, fontWeight:700, letterSpacing:"0.1em", marginBottom:8 }}>ATLAUA SPORTS CRM</div>
         <h1 style={{ margin:0, color:TX1, fontSize:32, fontWeight:800, letterSpacing:"-0.02em" }} className="mobile-text-sm">
-          Good {new Date().getHours()<12?"morning":"afternoon"} Mrs Sound 👋
+          Hello Team ATLAUA 👋
         </h1>
         <p style={{ margin:"8px 0 0", color:TX2, fontSize:15 }}>Here's your pipeline overview for today · {new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</p>
       </div>
