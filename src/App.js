@@ -1988,13 +1988,69 @@ function Pipeline({ athletes, onUpdate, onSelect }) {
   );
 }
 
+// ─── CONTACT EDIT PANEL ──────────────────────────────────────────────────────
+function ContactPanel({ contact, onClose, onSave }) {
+  const [ed, setEd] = useState({ ...contact });
+  const [saving, setSaving] = useState(false);
+  const cats = ["Agency","Brand","Media","Team","Partner","Distributor","Other"];
+
+  const save = async () => { setSaving(true); await onSave(ed); setSaving(false); onClose(); };
+
+  const field = (label, key) => (
+    <div style={{ marginBottom:14 }}>
+      <label style={{ color:TX3, fontSize:11, fontWeight:600, letterSpacing:"0.06em", textTransform:"uppercase", display:"block", marginBottom:5 }}>{label}</label>
+      {key==="category" ? (
+        <select value={ed[key]||"Other"} onChange={e=>setEd(p=>({...p,[key]:e.target.value}))}
+          style={{ background:C2, border:`1px solid ${BD}`, borderRadius:8, padding:"9px 12px",
+            color:TX1, fontSize:13, width:"100%", outline:"none", fontFamily:"inherit" }}>
+          {cats.map(c=><option key={c}>{c}</option>)}
+        </select>
+      ) : (
+        <input value={ed[key]||""} onChange={e=>setEd(p=>({...p,[key]:e.target.value}))}
+          style={{ background:C2, border:`1px solid ${BD}`, borderRadius:8, padding:"9px 12px",
+            color:TX1, fontSize:13, width:"100%", boxSizing:"border-box", outline:"none", fontFamily:"inherit",
+            transition:"border 0.2s" }}
+          onFocus={e=>e.target.style.borderColor=T+"66"}
+          onBlur={e=>e.target.style.borderColor=BD}
+        />
+      )}
+    </div>
+  );
+
+  return (
+    <>
+      <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.7)", backdropFilter:"blur(6px)", zIndex:900 }} onClick={onClose}/>
+      <div style={{ position:"fixed", right:0, top:0, bottom:0, width:"min(480px,95vw)",
+        background:SB, borderLeft:`1px solid ${BD2}`, boxShadow:"-12px 0 48px rgba(0,0,0,0.5)",
+        display:"flex", flexDirection:"column", zIndex:901 }}>
+        <div style={{ padding:"20px 24px", borderBottom:`1px solid ${BD}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <h2 style={{ margin:0, color:TX1, fontSize:18, fontWeight:700 }}>Edit Contact</h2>
+          <button onClick={onClose} style={{ background:C2, border:`1px solid ${BD}`, color:TX2, borderRadius:8, width:34, height:34, cursor:"pointer", fontSize:16 }}>x</button>
+        </div>
+        <div style={{ flex:1, overflowY:"auto", padding:"20px 24px" }}>
+          {field("Full Name","name")}
+          {field("Company","company")}
+          {field("Category","category")}
+          {field("Email","email")}
+          {field("Phone","phone")}
+        </div>
+        <div style={{ padding:"16px 24px", borderTop:`1px solid ${BD}`, display:"flex", gap:10 }}>
+          <Btn onClick={onClose} variant="ghost" style={{flex:1,justifyContent:"center"}}>Cancel</Btn>
+          <Btn onClick={save} style={{flex:2,justifyContent:"center"}} disabled={saving}>{saving?"Saving...":"Save Changes"}</Btn>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ─── CONTACTS (Grouped) ───────────────────────────────────────────────────────
-function Contacts({ contacts, onImport }) {
+function Contacts({ contacts, onImport, onUpdateContact }) {
   const [q, setQ]         = useState("");
   const [showImport, setShowImport]   = useState(false);
   const [showGmail, setShowGmail]     = useState(false);
   const [openCats, setOpenCats]       = useState(new Set(["Agency","Brand","Media","Team","Partner","Other"]));
   const [filterCat, setFilterCat]     = useState("All");
+  const [editContact, setEditContact] = useState(null);
 
   const cats = ["Agency","Brand","Media","Team","Partner","Distributor","Other"];
   const filtered = useMemo(()=>contacts.filter(c=>
@@ -2050,7 +2106,7 @@ function Contacts({ contacts, onImport }) {
             <div style={{ height:14, width:4, borderRadius:4, background:PCOLS[cats.indexOf(cat)%PCOLS.length] }}/>
             <div style={{ color:TX1, fontWeight:700, fontSize:14, flex:1 }}>{cat}</div>
             <Tag label={`${grouped[cat].length}`} color={PCOLS[cats.indexOf(cat)%PCOLS.length]}/>
-            <span style={{ color:TX3, fontSize:13 }}>{openCats.has(cat)?"▲":"▼"}</span>
+            <span style={{ color:TX3, fontSize:13 }}>{openCats.has(cat)?"^":"v"}</span>
           </div>
           {openCats.has(cat) && (
             <div style={{ border:`1px solid ${BD}`, borderTop:"none", borderRadius:"0 0 12px 12px",
@@ -2058,7 +2114,7 @@ function Contacts({ contacts, onImport }) {
               <table style={{ width:"100%", borderCollapse:"collapse" }}>
                 <thead>
                   <tr style={{ background:C2+"88" }}>
-                    {["Name","Company / Email","Source","Actions"].map(h=>(
+                    {["Name","Company / Email","Category","Actions"].map(h=>(
                       <th key={h} style={{ padding:"9px 16px", color:TX3, fontSize:11, fontWeight:700,
                         letterSpacing:"0.07em", textTransform:"uppercase", textAlign:"left",
                         borderBottom:`1px solid ${BD}` }}>{h}</th>
@@ -2067,23 +2123,31 @@ function Contacts({ contacts, onImport }) {
                 </thead>
                 <tbody>
                   {grouped[cat].map((c,i)=>(
-                    <tr key={i} style={{ background:i%2===0?"transparent":C2+"55" }}>
-                      <td style={{ padding:"11px 16px", color:TX1, fontSize:13, fontWeight:600 }}>{c.name}</td>
+                    <tr key={c.id||i} onClick={()=>setEditContact(c)} style={{ background:i%2===0?"transparent":C2+"55", cursor:"pointer", transition:"background 0.15s" }}
+                      onMouseEnter={e=>e.currentTarget.style.background=T+"12"}
+                      onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"transparent":C2+"55"}>
+                      <td style={{ padding:"11px 16px", color:TX1, fontSize:14, fontWeight:700 }}>{c.name}</td>
                       <td style={{ padding:"11px 16px" }}>
                         <div style={{ color:TX2, fontSize:12 }}>{c.company||""}</div>
-                        <a href={`mailto:${c.email}`} style={{ color:T, fontSize:11, textDecoration:"none" }}>{c.email}</a>
+                        <span style={{ color:T, fontSize:11 }}>{c.email}</span>
                       </td>
                       <td style={{ padding:"11px 16px" }}>
-                        <Tag label={c.source||"Manual"} color={TX2} bg={C3}/>
+                        <Tag label={c.category||"Other"} color={PCOLS[cats.indexOf(c.category||"Other")%PCOLS.length]}/>
                       </td>
                       <td style={{ padding:"11px 16px" }}>
-                        <button onClick={()=>{
-                          const url=`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(c.email||"")}`;
-                          window.open(url,"_blank","noopener,noreferrer");
-                        }} style={{ background:"none", border:`1px solid ${BD}`, color:T,
-                          borderRadius:6, padding:"4px 10px", fontSize:11, cursor:"pointer", fontFamily:"inherit" }}>
-                          Email
-                        </button>
+                        <div style={{ display:"flex", gap:6 }}>
+                          <button onClick={e=>{e.stopPropagation();setEditContact(c);}} style={{ background:"none", border:`1px solid ${BD}`, color:TX2,
+                            borderRadius:6, padding:"4px 10px", fontSize:11, cursor:"pointer", fontFamily:"inherit" }}>
+                            Edit
+                          </button>
+                          <button onClick={e=>{e.stopPropagation();
+                            const url=`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(c.email||"")}`;
+                            window.open(url,"_blank","noopener,noreferrer");
+                          }} style={{ background:"none", border:`1px solid ${BD}`, color:T,
+                            borderRadius:6, padding:"4px 10px", fontSize:11, cursor:"pointer", fontFamily:"inherit" }}>
+                            Email
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -2096,7 +2160,6 @@ function Contacts({ contacts, onImport }) {
 
       {!Object.keys(grouped).length && (
         <div style={{ textAlign:"center", padding:"48px 0" }}>
-          <div style={{ fontSize:40, marginBottom:12 }}>📭</div>
           <div style={{ color:TX1, fontWeight:600, fontSize:16 }}>No contacts yet</div>
           <div style={{ color:TX2, fontSize:13, marginTop:6 }}>Import a CSV or extract from Gmail to get started</div>
         </div>
@@ -2104,6 +2167,7 @@ function Contacts({ contacts, onImport }) {
 
       {showImport && <ImportCSVModal onClose={()=>setShowImport(false)} onImport={onImport} mode="contacts"/>}
       {showGmail  && <GmailConnectModal onClose={()=>setShowGmail(false)} onImport={onImport}/>}
+      {editContact && <ContactPanel contact={editContact} onClose={()=>setEditContact(null)} onSave={onUpdateContact}/>}
     </div>
   );
 }
@@ -2362,6 +2426,16 @@ export default function App() {
     }
   },[]);
 
+  const updContact = useCallback(async updated => {
+    if (updated.id) {
+      await supabase.from("contacts").update({
+        name: updated.name, company: updated.company, category: updated.category,
+        email: updated.email, phone: updated.phone
+      }).eq("id", updated.id);
+    }
+    setContacts(prev=>prev.map(c=>c.id===updated.id ? { ...updated, athlete: updated.name } : c));
+  },[]);
+
   const navItems = [
     { id:"Dashboard", label:"Dashboard", icon:NavIcons.Dashboard },
     { id:"Athletes",  label:"Athletes",  icon:NavIcons.Athletes,  badge:athletes.length },
@@ -2521,7 +2595,7 @@ export default function App() {
           {page==="Agencies"  && <Agencies  athletes={athletes} onSelect={setSel}/>}
           {page==="Teams"     && <Teams     athletes={athletes} onSelect={setSel}/>}
           {page==="Pipeline"  && <Pipeline  athletes={athletes} onUpdate={upd} onSelect={setSel}/>}
-          {page==="Contacts"  && <Contacts  contacts={contacts} onImport={importBatch}/>}
+          {page==="Contacts"  && <Contacts  contacts={contacts} onImport={importBatch} onUpdateContact={updContact}/>}
           {page==="Activity"  && <Activity  athletes={athletes} onSelect={setSel}/>}
           {page==="Export"    && <Export    athletes={athletes} contacts={contacts}/>}
         </main>
