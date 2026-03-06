@@ -755,67 +755,11 @@ function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" });
 }
 
-// ─── JAGUAR LOGO SVG ──────────────────────────────────────────────────────────
-function AtlauaJaguarLogo({ size = 40, textSize = 18 }) {
+// ─── JAGUAR LOGO ─────────────────────────────────────────────────────────────
+function AtlauaJaguarLogo({ size = 40 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="jgr1" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%"   stopColor="#06E8E1"/>
-          <stop offset="100%" stopColor="#04BDB7"/>
-        </linearGradient>
-        <linearGradient id="jgr2" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%"   stopColor="#04BDB7"/>
-          <stop offset="100%" stopColor="#037A76"/>
-        </linearGradient>
-        <filter id="jglow">
-          <feGaussianBlur stdDeviation="2" result="blur"/>
-          <feComposite in="SourceGraphic" in2="blur" operator="over"/>
-        </filter>
-      </defs>
-      {/* Outer drop / shield */}
-      <path d="M50 4 C50 4 18 28 18 54 C18 72 32 88 50 96 C68 88 82 72 82 54 C82 28 50 4 50 4Z"
-        fill="url(#jgr1)" opacity="0.12"/>
-      {/* Jaguar head silhouette - geometric */}
-      <path d="M50 16 C50 16 30 32 28 50 C26 62 34 70 50 74 C66 70 74 62 72 50 C70 32 50 16 50 16Z"
-        fill="url(#jgr1)" opacity="0.22"/>
-      {/* Ears */}
-      <path d="M33 36 L28 22 L40 32 Z" fill="url(#jgr1)"/>
-      <path d="M67 36 L72 22 L60 32 Z" fill="url(#jgr1)"/>
-      {/* Inner ear */}
-      <path d="M34 35 L30 25 L39 32 Z" fill="url(#jgr2)" opacity="0.5"/>
-      <path d="M66 35 L70 25 L61 32 Z" fill="url(#jgr2)" opacity="0.5"/>
-      {/* Face outline */}
-      <path d="M35 34 C27 42 26 55 30 63 C34 70 42 76 50 76 C58 76 66 70 70 63 C74 55 73 42 65 34 C61 29 55 27 50 27 C45 27 39 29 35 34Z"
-        fill="none" stroke="url(#jgr1)" strokeWidth="2.5"/>
-      {/* Eyes */}
-      <ellipse cx="41" cy="48" rx="5" ry="4" fill="url(#jgr1)" opacity="0.9"/>
-      <ellipse cx="59" cy="48" rx="5" ry="4" fill="url(#jgr1)" opacity="0.9"/>
-      {/* Pupils */}
-      <ellipse cx="41" cy="48" rx="2" ry="3" fill="#0A0613"/>
-      <ellipse cx="59" cy="48" rx="2" ry="3" fill="#0A0613"/>
-      {/* Eye shine */}
-      <circle cx="42.5" cy="46.5" r="1" fill="white" opacity="0.8"/>
-      <circle cx="60.5" cy="46.5" r="1" fill="white" opacity="0.8"/>
-      {/* Nose */}
-      <path d="M47 57 L50 60 L53 57 C52 54 48 54 47 57Z" fill="url(#jgr1)" opacity="0.9"/>
-      {/* Muzzle */}
-      <path d="M38 58 C40 64 44 67 50 68 C56 67 60 64 62 58" fill="none" stroke="url(#jgr1)" strokeWidth="1.5" strokeLinecap="round"/>
-      {/* Mouth */}
-      <path d="M50 60 L50 66" stroke="url(#jgr1)" strokeWidth="1.5" strokeLinecap="round"/>
-      {/* Cheek spots */}
-      <circle cx="35" cy="58" r="2" fill="url(#jgr1)" opacity="0.4"/>
-      <circle cx="39" cy="62" r="1.5" fill="url(#jgr1)" opacity="0.4"/>
-      <circle cx="65" cy="58" r="2" fill="url(#jgr1)" opacity="0.4"/>
-      <circle cx="61" cy="62" r="1.5" fill="url(#jgr1)" opacity="0.4"/>
-      {/* Forehead spots */}
-      <circle cx="50" cy="36" r="1.5" fill="url(#jgr1)" opacity="0.5"/>
-      <circle cx="44" cy="39" r="1" fill="url(#jgr1)" opacity="0.5"/>
-      <circle cx="56" cy="39" r="1" fill="url(#jgr1)" opacity="0.5"/>
-      {/* Bottom water drop / tail of ATLAUA brand */}
-      <path d="M50 76 C50 76 44 82 44 87 C44 91 46.8 94 50 94 C53.2 94 56 91 56 87 C56 82 50 76 50 76Z"
-        fill="url(#jgr1)" opacity="0.8" filter="url(#jglow)"/>
-    </svg>
+    <img src={process.env.PUBLIC_URL + "/logo.png"} alt="ATLAUA" width={size} height={size}
+      style={{ objectFit:"contain", display:"block" }}/>
   );
 }
 
