@@ -2346,7 +2346,13 @@ export default function App() {
   const [sbCollapsed, setSbCollapsed] = useState(false);
   const [globalQ, setGlobalQ] = useState("");
   const [mobileNav, setMobileNav] = useState(false);
-  const isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
+  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" && window.innerWidth <= 768);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   // Normalize Supabase row → local format (DB uses "name", app uses "athlete")
   const fromDB = (row) => ({ ...row, athlete: row.name || "" });
