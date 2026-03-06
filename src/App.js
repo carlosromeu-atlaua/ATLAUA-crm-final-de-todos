@@ -669,27 +669,27 @@ const DATA = [
 const TODAY   = new Date().toISOString().split("T")[0];
 const LEAGUES = ["NFL","NBA","NHL","MLB","UFC"];
 const STATUSES= ["Contacted","Negotiating","Proposal Sent","Closed Won","Closed Lost","Pending"];
-const ICONS   = {NFL:"🏈",NBA:"🏀",NHL:"🏒",MLB:"⚾",UFC:"🥊"};
+const ICONS   = {NFL:"",NBA:"",NHL:"",MLB:"",UFC:""};
 
-// ─── BRAND TOKENS ────────────────────────────────────────────────────────────
-const T     = "#04BDB7";
-const WINE  = "#800032";
-const BEIGE = "#FFF8E8";
-const GOLD  = "#E8A042";
-const GREEN = "#2FC88A";
-const ROSE  = "#E84C8B";
-const PURP  = "#7B6BD6";
+// ─── BRAND TOKENS (ATLAUA Brand Guidelines) ─────────────────────────────────
+const T     = "#04BDB7";   // Petrol – primary brand color
+const WINE  = "#800032";   // Bordeaux – primary brand color
+const BEIGE = "#FFF8E8";   // Beige – brand accent
+const GOLD  = "#E8A042";   // Warm accent
+const GREEN = "#2FC88A";   // Success
+const ROSE  = "#E84C8B";   // Rose accent
+const PURP  = "#7B6BD6";   // Purple accent
 
-const BG    = "#0D0A14";
-const SB    = "#08060F";
-const C1    = "#131020";
-const C2    = "#1A1530";
-const C3    = "#221E38";
-const BD    = "rgba(255,248,232,0.06)";
-const BD2   = `rgba(4,189,183,0.2)`;
+const BG    = "#0A0A0A";   // Near-black background
+const SB    = "#060606";   // Sidebar dark
+const C1    = "#111111";   // Card level 1
+const C2    = "#1A1A1A";   // Card level 2
+const C3    = "#222222";   // Card level 3
+const BD    = "rgba(255,248,232,0.08)";
+const BD2   = "rgba(4,189,183,0.2)";
 const TX1   = "#FFFFFF";
-const TX2   = "rgba(255,255,255,0.55)";
-const TX3   = "rgba(255,255,255,0.25)";
+const TX2   = "rgba(255,248,232,0.55)";
+const TX3   = "rgba(255,248,232,0.28)";
 
 const SCOL  = { Contacted:T, Negotiating:GOLD, "Proposal Sent":PURP, "Closed Won":GREEN, "Closed Lost":"#444", Pending:TX3 };
 const PCOLS = [T, WINE, GOLD, PURP, ROSE, GREEN];
@@ -782,7 +782,7 @@ function StatusPill({ status }) {
 
 function LeaguePill({ league }) {
   const col = LCOLS[league] || TX2;
-  return <Tag label={`${ICONS[league]||""} ${league}`} color={col} />;
+  return <Tag label={league} color={col} />;
 }
 
 function Btn({ children, onClick, variant="primary", size="md", icon, style:extraStyle={}, disabled=false }) {
@@ -1067,7 +1067,7 @@ function ImportCSVModal({ onClose, onImport, mode = "athletes" }) {
               </>
             ) : (
               <>
-                <div style={{ fontSize:48, marginBottom:16 }}>✅</div>
+                <div style={{ marginBottom:16, color:GREEN }}><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
                 <div style={{ color:TX1, fontWeight:700, fontSize:18 }}>Done! {done} records imported</div>
                 <div style={{ color:TX2, fontSize:13, marginTop:6 }}>Data is now in your CRM</div>
                 <div style={{ marginTop:20 }}>
@@ -1568,17 +1568,17 @@ function Dashboard({ athletes }) {
           borderRadius:"50%", background:WINE, opacity:0.06, pointerEvents:"none" }}/>
         <div style={{ color:TX3, fontSize:12, fontWeight:700, letterSpacing:"0.1em", marginBottom:8 }}>ATLAUA SPORTS CRM</div>
         <h1 style={{ margin:0, color:TX1, fontSize:32, fontWeight:800, letterSpacing:"-0.02em" }} className="mobile-text-sm">
-          Hello Team ATLAUA 👋
+          Hello Team ATLAUA
         </h1>
         <p style={{ margin:"8px 0 0", color:TX2, fontSize:15 }}>Here's your pipeline overview for today · {new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</p>
       </div>
 
       {/* KPIs */}
       <div style={{ display:"flex", gap:16, marginBottom:24, flexWrap:"wrap" }}>
-        <KpiCard label="Total Athletes" value={total} sub="in database" icon="🏅" color={T}/>
-        <KpiCard label="Active Deals" value={byStatus.Negotiating||0} sub="in negotiation" icon="🤝" color={GOLD}/>
-        <KpiCard label="Closed Won" value={byStatus["Closed Won"]||0} sub="signed" icon="✅" color={GREEN}/>
-        <KpiCard label="Proposals Out" value={byStatus["Proposal Sent"]||0} sub="pending response" icon="📄" color={PURP}/>
+        <KpiCard label="Total Athletes" value={total} sub="in database" icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>} color={T}/>
+        <KpiCard label="Active Deals" value={byStatus.Negotiating||0} sub="in negotiation" icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>} color={GOLD}/>
+        <KpiCard label="Closed Won" value={byStatus["Closed Won"]||0} sub="signed" icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>} color={GREEN}/>
+        <KpiCard label="Proposals Out" value={byStatus["Proposal Sent"]||0} sub="pending response" icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>} color={PURP}/>
       </div>
 
       {/* Charts row */}
@@ -1751,7 +1751,7 @@ function Athletes({ athletes, onSelect, onImport }) {
                 }}
                 onMouseEnter={e=>e.currentTarget.style.background=T+"12"}
                 onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"transparent":C2+"88"}>
-                  <td style={{ padding:"12px 14px", color:TX1, fontSize:13, fontWeight:600, whiteSpace:"nowrap" }}>{a.athlete}</td>
+                  <td style={{ padding:"12px 14px", color:TX1, fontSize:14, fontWeight:700, whiteSpace:"nowrap" }}>{a.athlete}</td>
                   <td style={{ padding:"12px 14px", color:TX2, fontSize:12 }}>{a.team}</td>
                   <td style={{ padding:"12px 14px" }}><LeaguePill league={a.league}/></td>
                   <td style={{ padding:"12px 14px", color:TX2, fontSize:12 }}>{a.agency}</td>
@@ -2206,7 +2206,7 @@ function Export({ athletes, contacts }) {
 }
 
 // ─── ACTIVITY / LOG ───────────────────────────────────────────────────────────
-function Activity({ athletes }) {
+function Activity({ athletes, onSelect }) {
   const log = useMemo(()=>{
     const actions=["Contacted","Proposal sent to","Negotiation started with","Status updated for","Notes added for","Email sent to"];
     const all=[];
@@ -2215,7 +2215,8 @@ function Activity({ athletes }) {
       const d=new Date(); d.setDate(d.getDate()-daysAgo);
       all.push({
         id:i, action:actions[Math.floor(Math.random()*actions.length)],
-        athlete:a.athlete, agency:a.agency, status:a.status, date:d, email:a.email
+        athlete:a.athlete, agency:a.agency, status:a.status, date:d, email:a.email,
+        _ref:a
       });
     });
     return all.sort((a,b)=>b.date-a.date);
@@ -2232,8 +2233,11 @@ function Activity({ athletes }) {
       <SearchInput value={q} onChange={setQ} placeholder="Filter activity..." style={{maxWidth:340,marginBottom:20}}/>
       <Card>
         {filtered.slice(0,50).map((l,i)=>(
-          <div key={l.id} style={{ display:"flex", gap:14, alignItems:"flex-start",
-            padding:"14px 0", borderBottom:i<filtered.length-1?`1px solid ${BD}`:"none" }}>
+          <div key={l.id} onClick={()=>onSelect(l._ref)} style={{ display:"flex", gap:14, alignItems:"flex-start",
+            padding:"14px 0", borderBottom:i<filtered.length-1?`1px solid ${BD}`:"none",
+            cursor:"pointer", borderRadius:8, transition:"background 0.15s" }}
+            onMouseEnter={e=>e.currentTarget.style.background=C2}
+            onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
             <div style={{ width:36, height:36, borderRadius:"50%", background:T+"22",
               border:`1px solid ${T}44`, display:"flex", alignItems:"center", justifyContent:"center",
               flexShrink:0, color:T, fontSize:14 }}>
@@ -2276,7 +2280,8 @@ export default function App() {
       try {
         const { data:ath } = await supabase.from("athletes").select("*");
         if(ath?.length) {
-          setAthletes(ath);
+          // Normalize: ensure "athlete" field exists (Supabase may use "name")
+          setAthletes(ath.map(a=>({ ...a, athlete: a.athlete || a.name || "" })));
         } else {
           // Fallback to local DATA
           setAthletes(DATA.map(r=>({
@@ -2295,8 +2300,12 @@ export default function App() {
   },[]);
 
   const upd = useCallback(async updated => {
-    await supabase.from("athletes").update(updated).eq("athlete",updated.athlete);
-    setAthletes(prev=>prev.map(a=>a.athlete===updated.athlete?updated:a));
+    if (updated.id) {
+      await supabase.from("athletes").update(updated).eq("id", updated.id);
+    } else {
+      await supabase.from("athletes").update(updated).eq("athlete", updated.athlete);
+    }
+    setAthletes(prev=>prev.map(a=>(a.id && a.id===updated.id) || a.athlete===updated.athlete ? updated : a));
   },[]);
 
   const addNew = useCallback(async (form, mode) => {
@@ -2495,7 +2504,7 @@ export default function App() {
           {page==="Teams"     && <Teams     athletes={athletes} onSelect={setSel}/>}
           {page==="Pipeline"  && <Pipeline  athletes={athletes} onUpdate={upd} onSelect={setSel}/>}
           {page==="Contacts"  && <Contacts  contacts={contacts} onImport={importBatch}/>}
-          {page==="Activity"  && <Activity  athletes={athletes}/>}
+          {page==="Activity"  && <Activity  athletes={athletes} onSelect={setSel}/>}
           {page==="Export"    && <Export    athletes={athletes} contacts={contacts}/>}
         </main>
       </div>
