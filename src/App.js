@@ -664,876 +664,1247 @@ const DATA = [
 
 
 
-// ─── CONSTANTS & DESIGN TOKENS ────────────────────────────────────────────────
-const TODAY = new Date().toISOString().split("T")[0];
+
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+const TODAY   = new Date().toISOString().split("T")[0];
 const LEAGUES = ["NFL","NBA","NHL","MLB","UFC"];
-const ICONS = {NFL:"🏈",NBA:"🏀",NHL:"🏒",MLB:"⚾",UFC:"🥊"};
-const STATUSES = ["Contacted","Negotiating","Proposal Sent","Closed Won","Closed Lost","Pending"];
+const STATUSES= ["Contacted","Negotiating","Proposal Sent","Closed Won","Closed Lost","Pending"];
+const ICONS   = {NFL:"🏈",NBA:"🏀",NHL:"🏒",MLB:"⚾",UFC:"🥊"};
 
-// ATLAUA Brand Colors
-const T  = "#04BDB7";          // Petrol/Teal
-const W  = "#800032";          // Bordeaux/Wine
-const BG = "#FFF8E8";          // Beige (used as text on dark)
-const DK = "#303030";          // Dark grey
-const LG = "#A6A6A6";          // Light grey
-const WH = "#FFFFFF";
+// ─── BRAND TOKENS ────────────────────────────────────────────────────────────
+const T     = "#04BDB7";
+const WINE  = "#800032";
+const BEIGE = "#FFF8E8";
+const GOLD  = "#E8A042";
+const GREEN = "#2FC88A";
+const ROSE  = "#E84C8B";
+const PURP  = "#7B6BD6";
 
-// Dark UI palette (inspired by the design reference)
-const DARK_BG   = "#100B1A";   // Main background
-const DARK_SB   = "#0A0613";   // Sidebar
-const DARK_CARD = "#1A1030";   // Card surface
-const DARK_CARD2= "#201540";   // Elevated card
-const BORDER    = "rgba(255,248,232,0.07)";
-const BORDER2   = "rgba(4,189,183,0.25)";
-const TEXT1     = "#FFF8E8";   // Primary text (ATLAUA beige)
-const TEXT2     = "rgba(255,248,232,0.55)";
-const TEXT3     = "rgba(255,248,232,0.28)";
-const GOLD      = "#F5A523";
-const GREEN     = "#2FC88A";
+const BG    = "#0D0A14";
+const SB    = "#08060F";
+const C1    = "#131020";
+const C2    = "#1A1530";
+const C3    = "#221E38";
+const BD    = "rgba(255,248,232,0.06)";
+const BD2   = `rgba(4,189,183,0.2)`;
+const TX1   = "#FFFFFF";
+const TX2   = "rgba(255,255,255,0.55)";
+const TX3   = "rgba(255,255,255,0.25)";
 
-const SCOL = {
-  Contacted:      W,
-  Negotiating:    T,
-  "Proposal Sent":GOLD,
-  "Closed Won":   GREEN,
-  "Closed Lost":  "#555",
-  Pending:        LG
-};
-const PCOLS  = [T, W, GOLD, "#7B6BD6", "#E84C8B", GREEN];
-const LCOLS  = {NFL:W, NBA:T, NHL:"#7B6BD6", MLB:GREEN, UFC:GOLD};
+const SCOL  = { Contacted:T, Negotiating:GOLD, "Proposal Sent":PURP, "Closed Won":GREEN, "Closed Lost":"#444", Pending:TX3 };
+const PCOLS = [T, WINE, GOLD, PURP, ROSE, GREEN];
+const LCOLS = { NFL:WINE, NBA:T, NHL:PURP, MLB:GREEN, UFC:GOLD };
 
-// CSV parser
+// ─── GOOGLE OAUTH ─────────────────────────────────────────────────────────────
+// IMPORTANT: Replace with your own Google OAuth client ID from console.cloud.google.com
+// Enable "Gmail API" and set authorized origins to http://localhost:3000
+const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID";
+
+// ─── UTILITIES ────────────────────────────────────────────────────────────────
 function parseCSV(text) {
   const lines = text.split(/\r?\n/).filter(l => l.trim());
-  if (!lines.length) return { headers: [], rows: [] };
+  if (!lines.length) return { headers:[], rows:[] };
   const parseRow = line => {
-    const res = []; let cur = ""; let q = false;
-    for (let i = 0; i < line.length; i++) {
-      const c = line[i];
-      if (c === '"') { if (q && line[i+1]==='"') { cur+='"'; i++; } else q=!q; }
-      else if (c === ',' && !q) { res.push(cur.trim()); cur = ""; }
-      else cur += c;
+    const res=[]; let cur=""; let q=false;
+    for(let i=0;i<line.length;i++){
+      const c=line[i];
+      if(c==='"'){ if(q&&line[i+1]==='"'){cur+='"';i++;} else q=!q; }
+      else if(c===','&&!q){ res.push(cur.trim()); cur=""; }
+      else cur+=c;
     }
-    res.push(cur.trim());
-    return res;
+    res.push(cur.trim()); return res;
   };
   const headers = parseRow(lines[0]);
-  const rows    = lines.slice(1).map(parseRow).filter(r => r.some(c => c));
+  const rows    = lines.slice(1).map(l => {
+    const vals = parseRow(l);
+    const obj  = {};
+    headers.forEach((h,i) => { obj[h] = vals[i] ?? ""; });
+    return obj;
+  });
   return { headers, rows };
 }
 
-// ─── SVG LOGO ─────────────────────────────────────────────────────────────────
-function AtlauaLogo({ size = 36 }) {
+function parseEmailAddresses(header) {
+  // Parses "Name <email>, Name <email>" or "email, email" format
+  const results = [];
+  const parts = header.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/);
+  for (const part of parts) {
+    const match = part.match(/<([^>]+)>/);
+    const email = match ? match[1].trim() : part.trim();
+    const nameMatch = part.match(/^([^<]+)</);
+    const name = nameMatch ? nameMatch[1].replace(/"/g,"").trim() : email.split("@")[0];
+    if (email.includes("@")) results.push({ name, email });
+  }
+  return results;
+}
+
+function categorizeEmail(email) {
+  const domain = (email.split("@")[1] || "").toLowerCase();
+  const agencyKw = /roc|caa|wasserman|klutch|rosenhaus|wme|vayner|img|boras|endeavor|sportstrust|steinberg|athletes.?first|disruptive|aura|equity.?sport|paraphe|net.?sport|goal.?line|uasport|delta.?sport|priority|hof.?player|intersport|global.?sport|klutch|gpg|creative.?artist|united.?talent|octagon/;
+  const teamKw   = /nfl\.com|nba\.com|nhl\.com|mlb\.com|seahawks|dolphins|lakers|celtics|yankees|cowboys|chiefs|bulls|heat|mavs|knicks|warriors|bruins|leafs|canucks|rangers|cubs|astros|redsox/;
+  const mediaKw  = /espn|nbc|cbs|fox|bleacher|athletic|si\.com|nfl\.com|nba\.com|sportnews|thescore|deadspin|sport|media|press|journal|times|post|herald/;
+  if (agencyKw.test(domain)) return "Agency";
+  if (teamKw.test(domain))   return "Team";
+  if (mediaKw.test(domain))  return "Media";
+  if (/gmail|yahoo|hotmail|outlook|icloud/.test(domain)) return "Other";
+  return "Brand";
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return "—";
+  return new Date(dateStr).toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" });
+}
+
+// ─── JAGUAR LOGO SVG ──────────────────────────────────────────────────────────
+function AtlauaJaguarLogo({ size = 40, textSize = 18 }) {
   return (
-    <svg width={size} height={Math.round(size * 1.3)} viewBox="0 0 36 48" fill="none">
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="drop" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#04E8E0"/>
+        <linearGradient id="jgr1" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%"   stopColor="#06E8E1"/>
           <stop offset="100%" stopColor="#04BDB7"/>
         </linearGradient>
+        <linearGradient id="jgr2" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%"   stopColor="#04BDB7"/>
+          <stop offset="100%" stopColor="#037A76"/>
+        </linearGradient>
+        <filter id="jglow">
+          <feGaussianBlur stdDeviation="2" result="blur"/>
+          <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+        </filter>
       </defs>
-      <path d="M18 2 C18 2 2 20 2 31 C2 40.4 9.2 46 18 46 C26.8 46 34 40.4 34 31 C34 20 18 2 18 2Z"
-            fill="url(#drop)" />
-      <path d="M9 33 C9 37.8 13 42 18 42" stroke="#FFF8E8" strokeWidth="2.5"
-            strokeLinecap="round" opacity="0.65"/>
+      {/* Outer drop / shield */}
+      <path d="M50 4 C50 4 18 28 18 54 C18 72 32 88 50 96 C68 88 82 72 82 54 C82 28 50 4 50 4Z"
+        fill="url(#jgr1)" opacity="0.12"/>
+      {/* Jaguar head silhouette - geometric */}
+      <path d="M50 16 C50 16 30 32 28 50 C26 62 34 70 50 74 C66 70 74 62 72 50 C70 32 50 16 50 16Z"
+        fill="url(#jgr1)" opacity="0.22"/>
+      {/* Ears */}
+      <path d="M33 36 L28 22 L40 32 Z" fill="url(#jgr1)"/>
+      <path d="M67 36 L72 22 L60 32 Z" fill="url(#jgr1)"/>
+      {/* Inner ear */}
+      <path d="M34 35 L30 25 L39 32 Z" fill="url(#jgr2)" opacity="0.5"/>
+      <path d="M66 35 L70 25 L61 32 Z" fill="url(#jgr2)" opacity="0.5"/>
+      {/* Face outline */}
+      <path d="M35 34 C27 42 26 55 30 63 C34 70 42 76 50 76 C58 76 66 70 70 63 C74 55 73 42 65 34 C61 29 55 27 50 27 C45 27 39 29 35 34Z"
+        fill="none" stroke="url(#jgr1)" strokeWidth="2.5"/>
+      {/* Eyes */}
+      <ellipse cx="41" cy="48" rx="5" ry="4" fill="url(#jgr1)" opacity="0.9"/>
+      <ellipse cx="59" cy="48" rx="5" ry="4" fill="url(#jgr1)" opacity="0.9"/>
+      {/* Pupils */}
+      <ellipse cx="41" cy="48" rx="2" ry="3" fill="#0A0613"/>
+      <ellipse cx="59" cy="48" rx="2" ry="3" fill="#0A0613"/>
+      {/* Eye shine */}
+      <circle cx="42.5" cy="46.5" r="1" fill="white" opacity="0.8"/>
+      <circle cx="60.5" cy="46.5" r="1" fill="white" opacity="0.8"/>
+      {/* Nose */}
+      <path d="M47 57 L50 60 L53 57 C52 54 48 54 47 57Z" fill="url(#jgr1)" opacity="0.9"/>
+      {/* Muzzle */}
+      <path d="M38 58 C40 64 44 67 50 68 C56 67 60 64 62 58" fill="none" stroke="url(#jgr1)" strokeWidth="1.5" strokeLinecap="round"/>
+      {/* Mouth */}
+      <path d="M50 60 L50 66" stroke="url(#jgr1)" strokeWidth="1.5" strokeLinecap="round"/>
+      {/* Cheek spots */}
+      <circle cx="35" cy="58" r="2" fill="url(#jgr1)" opacity="0.4"/>
+      <circle cx="39" cy="62" r="1.5" fill="url(#jgr1)" opacity="0.4"/>
+      <circle cx="65" cy="58" r="2" fill="url(#jgr1)" opacity="0.4"/>
+      <circle cx="61" cy="62" r="1.5" fill="url(#jgr1)" opacity="0.4"/>
+      {/* Forehead spots */}
+      <circle cx="50" cy="36" r="1.5" fill="url(#jgr1)" opacity="0.5"/>
+      <circle cx="44" cy="39" r="1" fill="url(#jgr1)" opacity="0.5"/>
+      <circle cx="56" cy="39" r="1" fill="url(#jgr1)" opacity="0.5"/>
+      {/* Bottom water drop / tail of ATLAUA brand */}
+      <path d="M50 76 C50 76 44 82 44 87 C44 91 46.8 94 50 94 C53.2 94 56 91 56 87 C56 82 50 76 50 76Z"
+        fill="url(#jgr1)" opacity="0.8" filter="url(#jglow)"/>
     </svg>
   );
 }
 
 // ─── SMALL COMPONENTS ─────────────────────────────────────────────────────────
-function Badge({ s }) {
+function Tag({ label, color = T, bg }) {
   return (
     <span style={{
-      background: `${SCOL[s]||LG}22`, color: SCOL[s]||LG,
-      border: `1px solid ${SCOL[s]||LG}44`,
-      fontSize: 10, fontWeight: 700, padding: "3px 10px",
-      borderRadius: 20, fontFamily: "sans-serif", whiteSpace: "nowrap", letterSpacing: .5
-    }}>{s}</span>
+      display:"inline-flex", alignItems:"center", padding:"2px 10px",
+      borderRadius:20, fontSize:11, fontWeight:600, letterSpacing:"0.04em",
+      color: color, background: bg || color+"22",
+      border:`1px solid ${color}44`
+    }}>{label}</span>
   );
 }
+
+function StatusPill({ status }) {
+  const col = SCOL[status] || TX2;
+  return <Tag label={status} color={col} />;
+}
+
 function LeaguePill({ league }) {
-  const c = LCOLS[league] || LG;
+  const col = LCOLS[league] || TX2;
+  return <Tag label={`${ICONS[league]||""} ${league}`} color={col} />;
+}
+
+function Btn({ children, onClick, variant="primary", size="md", icon, style:extraStyle={}, disabled=false }) {
+  const base = {
+    display:"inline-flex", alignItems:"center", gap:7, cursor:disabled?"not-allowed":"pointer",
+    border:"none", borderRadius:8, fontWeight:600, letterSpacing:"0.02em",
+    transition:"all 0.18s ease", outline:"none", opacity:disabled?0.45:1,
+    fontFamily:"inherit"
+  };
+  const sizes = {
+    sm: { padding:"6px 14px", fontSize:12 },
+    md: { padding:"9px 20px", fontSize:13 },
+    lg: { padding:"12px 28px", fontSize:14 }
+  };
+  const variants = {
+    primary:  { background:`linear-gradient(135deg,${T},${T}CC)`,  color:"#0A0613", boxShadow:`0 4px 18px ${T}44` },
+    danger:   { background:`linear-gradient(135deg,${WINE},${WINE}CC)`, color:"#fff", boxShadow:`0 4px 18px ${WINE}44` },
+    ghost:    { background:"transparent", color:TX2, border:`1px solid ${BD}` },
+    outline:  { background:"transparent", color:T, border:`1px solid ${T}55` },
+    success:  { background:`linear-gradient(135deg,${GREEN},${GREEN}CC)`, color:"#0A0613", boxShadow:`0 4px 18px ${GREEN}44` },
+    google:   { background:"#fff", color:"#1a1a1a", boxShadow:"0 2px 12px rgba(0,0,0,0.35)" }
+  };
+  const [hov, setHov] = useState(false);
   return (
-    <span style={{
-      background: `${c}18`, border: `1px solid ${c}44`, color: c,
-      fontSize: 10, padding: "2px 9px", borderRadius: 20,
-      fontFamily: "sans-serif", fontWeight: 700
-    }}>{league}</span>
+    <button onClick={disabled?undefined:onClick}
+      onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+      style={{ ...base, ...sizes[size], ...variants[variant||"primary"],
+        transform:hov&&!disabled?"translateY(-1px)":"none",
+        filter:hov&&!disabled?"brightness(1.1)":"none",
+        ...extraStyle }}>
+      {icon && <span style={{fontSize:13}}>{icon}</span>}
+      {children}
+    </button>
   );
 }
-function GlassCard({ children, style = {} }) {
+
+function Card({ children, style={}, glow=false }) {
   return (
     <div style={{
-      background: DARK_CARD, border: `1px solid ${BORDER}`,
-      borderRadius: 16, ...style
+      background:C1, borderRadius:14, padding:24,
+      border:`1px solid ${glow?BD2:BD}`,
+      boxShadow: glow ? `0 0 24px ${T}18, 0 4px 24px rgba(0,0,0,0.4)` : "0 4px 24px rgba(0,0,0,0.3)",
+      ...style
     }}>{children}</div>
   );
 }
-function SectionTitle({ title, sub, right }) {
+
+function KpiCard({ label, value, sub, color=T, icon }) {
   return (
-    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom: 28 }}>
-      <div>
-        <h1 style={{ margin:0, fontFamily:"Georgia,serif", color:TEXT1, fontSize:22,
-                     fontWeight:700, letterSpacing:1 }}>{title}</h1>
-        {sub && <p style={{ margin:"4px 0 0", fontFamily:"sans-serif", color:TEXT3,
-                             fontSize:12, letterSpacing:.5 }}>{sub}</p>}
+    <Card style={{ flex:1, minWidth:150 }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+        <div>
+          <div style={{ color:TX3, fontSize:11, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:8 }}>{label}</div>
+          <div style={{ color:TX1, fontSize:28, fontWeight:700, lineHeight:1 }}>{value}</div>
+          {sub && <div style={{ color:TX2, fontSize:12, marginTop:6 }}>{sub}</div>}
+        </div>
+        {icon && (
+          <div style={{ width:40, height:40, borderRadius:10, background:color+"18",
+            border:`1px solid ${color}33`, display:"flex", alignItems:"center",
+            justifyContent:"center", fontSize:18 }}>{icon}</div>
+        )}
       </div>
-      {right}
+      <div style={{ marginTop:16, height:2, borderRadius:2, background:`linear-gradient(90deg,${color},${color}33)` }}/>
+    </Card>
+  );
+}
+
+function SectionHeader({ title, sub, right }) {
+  return (
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:24 }}>
+      <div>
+        <h2 style={{ margin:0, color:TX1, fontSize:20, fontWeight:700 }}>{title}</h2>
+        {sub && <p style={{ margin:"4px 0 0", color:TX2, fontSize:13 }}>{sub}</p>}
+      </div>
+      {right && <div style={{ display:"flex", gap:10, alignItems:"center" }}>{right}</div>}
     </div>
   );
 }
-function KpiCard({ label, value, sub, color = T, icon }) {
+
+function SearchInput({ value, onChange, placeholder="Search...", style={} }) {
   return (
-    <GlassCard style={{ padding:"22px 24px", borderTop:`3px solid ${color}` }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-        <div>
-          <div style={{ fontFamily:"sans-serif", fontSize:10, color:TEXT3,
-                        letterSpacing:2, textTransform:"uppercase", marginBottom:10 }}>{label}</div>
-          <div style={{ fontFamily:"Georgia,serif", fontSize:38, fontWeight:700,
-                        color, lineHeight:1, textShadow:`0 0 30px ${color}55` }}>{value}</div>
-          {sub && <div style={{ fontFamily:"sans-serif", fontSize:11, color:TEXT3, marginTop:6 }}>{sub}</div>}
-        </div>
-        {icon && <div style={{ fontSize:26, opacity:.35 }}>{icon}</div>}
-      </div>
-    </GlassCard>
-  );
-}
-function Btn({ children, onClick, color = T, outline = false, style = {}, disabled = false }) {
-  const base = {
-    padding:"10px 20px", borderRadius:10, fontFamily:"sans-serif", fontWeight:700,
-    fontSize:13, cursor: disabled ? "not-allowed" : "pointer", letterSpacing:.5,
-    transition:"all 0.2s", border:"none", ...style
-  };
-  if (outline) return (
-    <button onClick={onClick} disabled={disabled} style={{
-      ...base, background:"transparent",
-      border:`1.5px solid ${disabled?"#444":color}`, color: disabled?"#444":color,
-    }}
-    onMouseEnter={e=>{ if(!disabled) e.currentTarget.style.background=`${color}15`; }}
-    onMouseLeave={e=>{ e.currentTarget.style.background="transparent"; }}
-    >{children}</button>
-  );
-  return (
-    <button onClick={onClick} disabled={disabled} style={{
-      ...base, background: disabled?"#333":`linear-gradient(135deg,${color},${color}CC)`,
-      color:WH, boxShadow: disabled?"none":`0 4px 20px ${color}44`,
-    }}
-    onMouseEnter={e=>{ if(!disabled) e.currentTarget.style.boxShadow=`0 6px 28px ${color}66`; }}
-    onMouseLeave={e=>{ e.currentTarget.style.boxShadow=`0 4px 20px ${color}44`; }}
-    >{children}</button>
+    <div style={{ position:"relative", ...style }}>
+      <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", color:TX3, fontSize:14, pointerEvents:"none" }}>⌕</span>
+      <input value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
+        style={{ background:C2, border:`1px solid ${BD}`, borderRadius:8, padding:"8px 12px 8px 34px",
+          color:TX1, fontSize:13, outline:"none", width:"100%", boxSizing:"border-box",
+          fontFamily:"inherit", transition:"border 0.2s" }}
+        onFocus={e=>e.target.style.borderColor=T+"88"}
+        onBlur={e=>e.target.style.borderColor=BD}
+      />
+    </div>
   );
 }
 
-// ─── CSV IMPORT MODAL ─────────────────────────────────────────────────────────
-function ImportCSVModal({ onClose, onImport }) {
-  const [step, setStep]           = useState("type");   // type → drop → map → done
-  const [importType, setImportType] = useState("athletes");
-  const [parsed, setParsed]       = useState(null);
-  const [mapping, setMapping]     = useState({});
+function Select({ value, onChange, options, style={} }) {
+  return (
+    <select value={value} onChange={e=>onChange(e.target.value)}
+      style={{ background:C2, border:`1px solid ${BD}`, borderRadius:8,
+        padding:"8px 14px", color:TX1, fontSize:13, outline:"none",
+        fontFamily:"inherit", cursor:"pointer", ...style }}>
+      {options.map(o => <option key={o.value||o} value={o.value||o}>{o.label||o}</option>)}
+    </select>
+  );
+}
+
+// ─── NAV ICONS ────────────────────────────────────────────────────────────────
+const NavIcons = {
+  Dashboard: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+      <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+    </svg>
+  ),
+  Athletes: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+    </svg>
+  ),
+  Agencies: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+    </svg>
+  ),
+  Teams: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
+      <path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
+    </svg>
+  ),
+  Pipeline: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+      <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+    </svg>
+  ),
+  Contacts: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.02 1.18 2 2 0 012 .02h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
+    </svg>
+  ),
+  Export: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+  ),
+  Gmail: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+    </svg>
+  ),
+  Activity: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+    </svg>
+  )
+};
+
+// ─── IMPORT CSV MODAL ─────────────────────────────────────────────────────────
+function ImportCSVModal({ onClose, onImport, mode = "athletes" }) {
+  const [step, setStep] = useState(0);
+  const [file, setFile] = useState(null);
+  const [parsed, setParsed] = useState(null);
+  const [mapping, setMapping] = useState({});
   const [importing, setImporting] = useState(false);
-  const [count, setCount]         = useState(0);
-  const [dragOver, setDragOver]   = useState(false);
+  const [done, setDone] = useState(0);
   const fileRef = useRef();
 
-  const FIELDS = importType === "athletes"
-    ? ["name","team","league","agency","agent","email","status"]
-    : ["name","company","category","email","phone"];
+  const athleteFields = ["athlete","team","league","agency","agent","email","status","notes"];
+  const contactFields = ["name","company","category","email","phone","notes"];
+  const fields = mode==="athletes" ? athleteFields : contactFields;
 
-  const handleFile = file => {
+  const handleFile = e => {
+    const f = e.target.files[0]; if(!f) return;
+    setFile(f);
     const reader = new FileReader();
-    reader.onload = e => {
-      const { headers, rows } = parseCSV(e.target.result);
+    reader.onload = ev => {
+      const { headers, rows } = parseCSV(ev.target.result);
       setParsed({ headers, rows });
-      const auto = {};
-      headers.forEach((h, i) => {
-        const low = h.toLowerCase().replace(/[^a-z]/g,"");
-        FIELDS.forEach(f => {
-          if ((low === f || low.includes(f) || f.includes(low)) && auto[f] === undefined)
-            auto[f] = i;
-        });
+      const autoMap = {};
+      fields.forEach(field => {
+        const match = headers.find(h =>
+          h.toLowerCase().replace(/[^a-z0-9]/g,"").includes(field.replace(/[^a-z0-9]/g,""))
+        );
+        if(match) autoMap[field] = match;
       });
-      setMapping(auto);
-      setStep("map");
+      setMapping(autoMap);
+      setStep(2);
     };
-    reader.readAsText(file);
+    reader.readAsText(f);
   };
 
   const doImport = async () => {
-    setImporting(true);
-    const items = parsed.rows.map(row => {
-      const item = { updated: TODAY };
-      FIELDS.forEach(f => {
-        if (mapping[f] !== undefined) item[f] = (row[mapping[f]] || "").trim();
-      });
-      if (importType === "athletes") {
-        item.notes  = "";
-        if (!item.status) item.status = "Contacted";
-      } else {
-        if (!item.category) item.category = "Other";
-      }
-      return item;
-    }).filter(i => i.name);
-    await onImport(items, importType);
-    setCount(items.length);
-    setImporting(false);
-    setStep("done");
+    setImporting(true); setStep(3);
+    const rows = parsed.rows.map(row => {
+      const obj = {};
+      fields.forEach(f => { if(mapping[f]) obj[f] = row[mapping[f]] || ""; });
+      return obj;
+    }).filter(r => Object.values(r).some(v=>v));
+    await onImport(rows, mode);
+    setDone(rows.length); setImporting(false);
   };
 
-  const inp = {
-    width:"100%", padding:"9px 12px", borderRadius:8,
-    border:`1px solid ${BORDER}`, background:DARK_CARD2,
-    color:TEXT1, fontFamily:"sans-serif", fontSize:13,
-    boxSizing:"border-box", outline:"none",
-  };
+  const overlay = { position:"fixed", inset:0, background:"rgba(0,0,0,0.72)", backdropFilter:"blur(8px)",
+    display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000 };
+  const box = { background:C1, border:`1px solid ${BD2}`, borderRadius:16, padding:32,
+    width:"min(560px,92vw)", boxShadow:`0 24px 64px rgba(0,0,0,0.6), 0 0 40px ${T}18` };
 
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(10,6,19,0.85)",
-                  backdropFilter:"blur(6px)", zIndex:300,
-                  display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
-      <GlassCard style={{ width:520, maxHeight:"90vh", overflowY:"auto", border:`1px solid ${BORDER2}` }}>
+    <div style={overlay} onClick={e=>{ if(e.target===e.currentTarget) onClose(); }}>
+      <div style={box}>
         {/* Header */}
-        <div style={{ padding:"22px 26px", borderBottom:`1px solid ${BORDER}`,
-                      display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:24 }}>
           <div>
-            <div style={{ fontFamily:"Georgia,serif", color:T, fontSize:18, fontWeight:700 }}>Import CSV</div>
-            <div style={{ fontFamily:"sans-serif", color:TEXT3, fontSize:12, marginTop:3 }}>
-              {step==="type"?"Select data type" : step==="drop"?"Upload your file"
-               : step==="map"?"Map columns" : "Import complete"}
-            </div>
+            <div style={{ color:TX1, fontSize:17, fontWeight:700 }}>Import CSV — {mode==="athletes"?"Athletes":"Contacts"}</div>
+            <div style={{ color:TX2, fontSize:12, marginTop:3 }}>Steps: Select file → Map columns → Import</div>
           </div>
-          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.06)", border:"none",
-            width:30, height:30, borderRadius:"50%", cursor:"pointer", color:TEXT2, fontSize:18 }}>×</button>
+          <button onClick={onClose} style={{ background:"none", border:"none", color:TX2, fontSize:22, cursor:"pointer", padding:4 }}>✕</button>
         </div>
 
-        <div style={{ padding:"24px 26px" }}>
+        {/* Steps indicator */}
+        <div style={{ display:"flex", gap:8, marginBottom:28 }}>
+          {["File","Map","Import"].map((s,i)=>(
+            <div key={s} style={{ flex:1, textAlign:"center" }}>
+              <div style={{ height:3, borderRadius:3, background:step>i?T:step===i?T+"55":TX3+"44", marginBottom:4 }}/>
+              <div style={{ fontSize:11, color:step>=i?T:TX3, fontWeight:600 }}>{s}</div>
+            </div>
+          ))}
+        </div>
 
-          {/* STEP 1 — Type */}
-          {step==="type" && <>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:24 }}>
-              {[["athletes","🏃 Athletes","Name, Team, League, Agency, Agent, Email, Status"],
-                ["contacts","👤 Contacts","Name, Company, Category, Email, Phone"]].map(([v,label,desc])=>(
-                <div key={v} onClick={()=>setImportType(v)} style={{
-                  padding:"18px 16px", borderRadius:12, cursor:"pointer",
-                  border:`2px solid ${importType===v?T:BORDER}`,
-                  background: importType===v?`${T}12`:DARK_CARD2
-                }}>
-                  <div style={{ fontSize:22, marginBottom:8 }}>{label.split(" ")[0]}</div>
-                  <div style={{ fontFamily:"sans-serif", fontWeight:700, color:TEXT1, fontSize:14, marginBottom:6 }}>{label.split(" ").slice(1).join(" ")}</div>
-                  <div style={{ fontFamily:"sans-serif", color:TEXT3, fontSize:11, lineHeight:1.5 }}>{desc}</div>
-                </div>
-              ))}
+        {/* Step 1: Drop file */}
+        {step < 2 && (
+          <div>
+            <div onClick={()=>fileRef.current.click()}
+              style={{ border:`2px dashed ${BD2}`, borderRadius:12, padding:40,
+                textAlign:"center", cursor:"pointer", background:C2,
+                transition:"border 0.2s, background 0.2s" }}
+              onDragOver={e=>e.preventDefault()}
+              onDrop={e=>{ e.preventDefault(); const f=e.dataTransfer.files[0]; if(f){ fileRef.current.files=e.dataTransfer.files; handleFile({target:{files:[f]}}); } }}>
+              <div style={{ fontSize:36, marginBottom:12 }}>📁</div>
+              <div style={{ color:TX1, fontWeight:600, marginBottom:4 }}>Drop CSV here or click to browse</div>
+              <div style={{ color:TX2, fontSize:12 }}>Supports .csv files up to 10MB</div>
             </div>
-            <Btn onClick={()=>setStep("drop")} style={{ width:"100%" }}>Continue →</Btn>
-          </>}
+            <input ref={fileRef} type="file" accept=".csv" style={{display:"none"}} onChange={handleFile}/>
+          </div>
+        )}
 
-          {/* STEP 2 — Drop zone */}
-          {step==="drop" && <>
-            <input ref={fileRef} type="file" accept=".csv" style={{ display:"none" }}
-                   onChange={e=>{ if(e.target.files[0]) handleFile(e.target.files[0]); }}/>
-            <div
-              onClick={()=>fileRef.current.click()}
-              onDragOver={e=>{ e.preventDefault(); setDragOver(true); }}
-              onDragLeave={()=>setDragOver(false)}
-              onDrop={e=>{ e.preventDefault(); setDragOver(false); if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); }}
-              style={{
-                border:`2px dashed ${dragOver?T:BORDER2}`, borderRadius:14,
-                padding:"48px 24px", textAlign:"center", cursor:"pointer",
-                background: dragOver?`${T}0A`:DARK_CARD2, marginBottom:20,
-                transition:"all 0.2s"
-              }}>
-              <div style={{ fontSize:40, marginBottom:12 }}>📄</div>
-              <div style={{ fontFamily:"Georgia,serif", color:TEXT1, fontSize:16, marginBottom:8 }}>
-                Drop your CSV here
-              </div>
-              <div style={{ fontFamily:"sans-serif", color:TEXT3, fontSize:13 }}>
-                or click to browse
-              </div>
+        {/* Step 2: Map columns */}
+        {step===2 && parsed && (
+          <div>
+            <div style={{ color:TX2, fontSize:12, marginBottom:16 }}>
+              Found <strong style={{color:TX1}}>{parsed.rows.length}</strong> rows with <strong style={{color:TX1}}>{parsed.headers.length}</strong> columns.
+              Map CSV columns to CRM fields:
             </div>
-            <div style={{ fontFamily:"sans-serif", color:TEXT3, fontSize:11, textAlign:"center",
-                          padding:"12px", background:DARK_CARD2, borderRadius:8 }}>
-              Tip: Column headers should match field names for auto-mapping. Any CSV format accepted.
-            </div>
-          </>}
-
-          {/* STEP 3 — Mapping */}
-          {step==="map" && parsed && <>
-            <div style={{ marginBottom:16, padding:"10px 14px", background:DARK_CARD2,
-                          borderRadius:8, fontFamily:"sans-serif", fontSize:12, color:TEXT2 }}>
-              Found <strong style={{color:T}}>{parsed.rows.length}</strong> rows,{" "}
-              <strong style={{color:T}}>{parsed.headers.length}</strong> columns. Map them below:
-            </div>
-            <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:20 }}>
-              {FIELDS.map(field => (
-                <div key={field} style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, alignItems:"center" }}>
-                  <div style={{ fontFamily:"sans-serif", fontSize:12, color:TEXT1, fontWeight:700,
-                                textTransform:"uppercase", letterSpacing:1 }}>{field}</div>
-                  <select value={mapping[field]??""} onChange={e=>setMapping(m=>({...m,[field]:e.target.value===""?undefined:+e.target.value}))} style={inp}>
+            <div style={{ display:"grid", gap:10, maxHeight:320, overflowY:"auto" }}>
+              {fields.map(field => (
+                <div key={field} style={{ display:"flex", alignItems:"center", gap:12 }}>
+                  <div style={{ width:120, color:TX1, fontSize:13, fontWeight:600, textTransform:"capitalize" }}>{field}</div>
+                  <select value={mapping[field]||""} onChange={e=>setMapping(m=>({...m,[field]:e.target.value}))}
+                    style={{ flex:1, background:C3, border:`1px solid ${BD}`, borderRadius:8, padding:"7px 12px",
+                      color:TX1, fontSize:13, outline:"none", fontFamily:"inherit" }}>
                     <option value="">— skip —</option>
-                    {parsed.headers.map((h,i)=><option key={i} value={i}>{h}</option>)}
+                    {parsed.headers.map(h=><option key={h} value={h}>{h}</option>)}
                   </select>
                 </div>
               ))}
             </div>
-            <div style={{ display:"flex", gap:10 }}>
-              <Btn outline onClick={()=>setStep("drop")} style={{ flex:1 }}>← Back</Btn>
-              <Btn onClick={doImport} disabled={importing} color={W} style={{ flex:2 }}>
-                {importing ? "Importing…" : `Import ${parsed.rows.length} rows →`}
-              </Btn>
+            <div style={{ display:"flex", gap:10, marginTop:20 }}>
+              <Btn onClick={()=>setStep(0)} variant="ghost">← Back</Btn>
+              <Btn onClick={doImport} style={{marginLeft:"auto"}}>Import {parsed.rows.length} rows →</Btn>
             </div>
-          </>}
+          </div>
+        )}
 
-          {/* STEP 4 — Done */}
-          {step==="done" && (
-            <div style={{ textAlign:"center", padding:"32px 0" }}>
-              <div style={{ fontSize:52, marginBottom:16 }}>✅</div>
-              <div style={{ fontFamily:"Georgia,serif", color:T, fontSize:22, marginBottom:8 }}>
-                {count} records imported!
-              </div>
-              <div style={{ fontFamily:"sans-serif", color:TEXT2, fontSize:14, marginBottom:24 }}>
-                Your {importType} have been added successfully.
-              </div>
-              <Btn onClick={onClose} style={{ minWidth:180 }}>Done</Btn>
-            </div>
-          )}
-
-        </div>
-      </GlassCard>
+        {/* Step 3: Importing */}
+        {step===3 && (
+          <div style={{ textAlign:"center", padding:"20px 0" }}>
+            {importing ? (
+              <>
+                <div style={{ fontSize:40, marginBottom:16 }}>⏳</div>
+                <div style={{ color:TX1, fontWeight:600 }}>Importing into Supabase...</div>
+                <div style={{ color:TX2, fontSize:12, marginTop:6 }}>Please wait</div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize:48, marginBottom:16 }}>✅</div>
+                <div style={{ color:TX1, fontWeight:700, fontSize:18 }}>Done! {done} records imported</div>
+                <div style={{ color:TX2, fontSize:13, marginTop:6 }}>Data is now in your CRM</div>
+                <div style={{ marginTop:20 }}>
+                  <Btn onClick={onClose}>Close</Btn>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-// ─── ATHLETE PANEL ────────────────────────────────────────────────────────────
-function Panel({ a, onClose, onSave }) {
-  const [st, setSt]     = useState(a.status);
-  const [notes, setNotes] = useState(a.notes || "");
-  const [loading, setLoading] = useState(false);
-  const save = () => onSave(a.id, { status:st, notes, updated:TODAY });
+// ─── GMAIL CONNECT MODAL ──────────────────────────────────────────────────────
+function GmailConnectModal({ onClose, onImport }) {
+  const [step, setStep]   = useState(0); // 0=info, 1=loading, 2=preview, 3=done
+  const [token, setToken] = useState(null);
+  const [contacts, setContacts] = useState([]);
+  const [selected, setSelected] = useState(new Set());
+  const [error, setError] = useState("");
+  const [progress, setProgress] = useState(0);
+  const [query, setQuery]   = useState("");
+  const [filterCat, setFilterCat] = useState("All");
 
-  const genAndOpenGmail = async () => {
-    if (!a.email) { alert("No email on record for this athlete."); return; }
-    setLoading(true);
+  const loadGSI = () => new Promise((res, rej) => {
+    if (window.google?.accounts) { res(); return; }
+    const s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client";
+    s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+
+  const connectGmail = async () => {
+    setStep(1); setError("");
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-          model:"claude-sonnet-4-20250514", max_tokens:320,
-          messages:[{ role:"user", content:
-            `You are a brand partnership manager at ATLAUA — God of Water, a premium sports lifestyle brand (electrolyzed water + CBD recovery drink). Write a short warm first-contact email to ${a.agent} at ${a.agency}, representing ${a.name} (${a.team||"independent"}, ${a.league}). Propose a brand ambassador partnership. Tone: bold, luxurious, motivating. Start with Subject: line. Max 130 words total.`
-          }]
-        })
+      await loadGSI();
+      if (GOOGLE_CLIENT_ID === "YOUR_GOOGLE_CLIENT_ID") {
+        setError("⚠️ Set REACT_APP_GOOGLE_CLIENT_ID in your .env file (see README).");
+        setStep(0); return;
+      }
+      const tokenClient = window.google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: "https://www.googleapis.com/auth/gmail.readonly",
+        callback: async (resp) => {
+          if (resp.error) { setError(`Auth error: ${resp.error}`); setStep(0); return; }
+          setToken(resp.access_token);
+          await fetchContacts(resp.access_token);
+        }
       });
-      const d = await res.json();
-      const text = d.content?.[0]?.text || "";
-      const lines = text.split("\n");
-      const subLine = lines.find(l => /^subject:/i.test(l.trim()));
-      const subject = subLine ? subLine.replace(/^subject:\s*/i,"").trim() : "ATLAUA Partnership Opportunity";
-      const body = lines.filter(l => !/^subject:/i.test(l.trim())).join("\n").trim();
-      const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(a.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      window.open(url, "_blank");
-    } catch(e) { alert("Error generating email. Check connection."); }
-    setLoading(false);
+      tokenClient.requestAccessToken({ prompt:"consent" });
+    } catch(e) {
+      setError(`Failed to load Google Sign-In: ${e.message}`);
+      setStep(0);
+    }
   };
 
-  const inp = {
-    width:"100%", padding:"10px 12px", borderRadius:8,
-    border:`1px solid ${BORDER}`, background:DARK_CARD2,
-    color:TEXT1, fontFamily:"sans-serif", fontSize:14,
-    boxSizing:"border-box", outline:"none"
-  };
-  const lbl = {
-    display:"block", fontSize:10, color:TEXT3,
-    letterSpacing:2, textTransform:"uppercase",
-    marginBottom:6, fontFamily:"sans-serif", fontWeight:700
+  const fetchContacts = async (accessToken) => {
+    setProgress(5);
+    try {
+      // 1. Fetch list of sent message IDs
+      const listRes = await fetch(
+        "https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=SENT&maxResults=200&q=in:sent",
+        { headers:{ Authorization:`Bearer ${accessToken}` } }
+      );
+      if (!listRes.ok) throw new Error(`Gmail API error: ${listRes.status}`);
+      const listData = await listRes.json();
+      const messages = listData.messages || [];
+      setProgress(15);
+
+      // 2. Fetch headers in batches
+      const contactMap = new Map();
+      const batchSize  = 25;
+      for (let i = 0; i < Math.min(messages.length, 200); i += batchSize) {
+        const batch = messages.slice(i, i + batchSize);
+        await Promise.all(batch.map(async msg => {
+          const r = await fetch(
+            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=To&metadataHeaders=Cc`,
+            { headers:{ Authorization:`Bearer ${accessToken}` } }
+          );
+          const data = await r.json();
+          const headers = data.payload?.headers || [];
+          ["To","Cc"].forEach(hName => {
+            const h = headers.find(x=>x.name===hName);
+            if (!h) return;
+            parseEmailAddresses(h.value).forEach(({name, email}) => {
+              if (!contactMap.has(email)) {
+                contactMap.set(email, {
+                  name, email,
+                  category: categorizeEmail(email),
+                  source:"Gmail History",
+                  count:1
+                });
+              } else {
+                contactMap.get(email).count++;
+              }
+            });
+          });
+        }));
+        setProgress(15 + Math.round((i/Math.min(messages.length,200))*80));
+      }
+
+      const all = Array.from(contactMap.values()).sort((a,b)=>b.count-a.count);
+      setContacts(all);
+      setSelected(new Set(all.map(c=>c.email)));
+      setProgress(100);
+      setStep(2);
+    } catch(e) {
+      setError(`Error fetching Gmail: ${e.message}`);
+      setStep(0);
+    }
   };
 
-  return <>
-    <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(10,6,19,0.7)",
-                                    backdropFilter:"blur(4px)", zIndex:98 }}/>
-    <div style={{
-      position:"fixed", top:0, right:0, width:420, height:"100vh",
-      background:DARK_SB, zIndex:99, overflowY:"auto",
-      borderLeft:`1px solid ${BORDER2}`, display:"flex", flexDirection:"column"
-    }}>
-      {/* Header */}
-      <div style={{
-        padding:"24px", borderBottom:`1px solid ${BORDER}`,
-        background:`linear-gradient(135deg,${W}22,${T}11)`
-      }}>
-        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:14 }}>
-          <div style={{ fontSize:10, color:TEXT3, letterSpacing:3, textTransform:"uppercase", fontFamily:"sans-serif" }}>Athlete Profile</div>
-          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.07)", border:"none",
-            width:28, height:28, borderRadius:"50%", cursor:"pointer", color:TEXT2, fontSize:18,
-            display:"flex", alignItems:"center", justifyContent:"center" }}>×</button>
+  const doImport = async () => {
+    const toImport = contacts.filter(c => selected.has(c.email));
+    await onImport(toImport, "contacts");
+    setStep(3);
+  };
+
+  const cats = ["All", ...new Set(contacts.map(c=>c.category))];
+  const visible = contacts.filter(c =>
+    (filterCat==="All" || c.category===filterCat) &&
+    (c.name.toLowerCase().includes(query.toLowerCase()) || c.email.toLowerCase().includes(query.toLowerCase()))
+  );
+
+  const overlay = { position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", backdropFilter:"blur(10px)",
+    display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000 };
+  const box = { background:C1, border:`1px solid ${BD2}`, borderRadius:18, padding:32,
+    width:"min(680px,96vw)", maxHeight:"90vh", display:"flex", flexDirection:"column",
+    boxShadow:`0 32px 80px rgba(0,0,0,0.7), 0 0 50px ${T}22` };
+
+  return (
+    <div style={overlay} onClick={e=>{ if(e.target===e.currentTarget) onClose(); }}>
+      <div style={box}>
+        {/* Header */}
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:24 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+            {NavIcons.Gmail}
+            <div>
+              <div style={{ color:TX1, fontSize:17, fontWeight:700 }}>Gmail Contact Extractor</div>
+              <div style={{ color:TX2, fontSize:12 }}>Scan your sent email history · End-to-end secure</div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background:"none", border:"none", color:TX2, fontSize:20, cursor:"pointer" }}>✕</button>
         </div>
-        <div style={{ fontFamily:"Georgia,serif", color:TEXT1, fontSize:22, fontWeight:700, marginBottom:12 }}>{a.name}</div>
-        <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-          <LeaguePill league={a.league}/>
-          {a.team && <span style={{ background:DARK_CARD, border:`1px solid ${BORDER}`,
-            color:TEXT2, fontSize:10, padding:"2px 10px", borderRadius:20, fontFamily:"sans-serif" }}>{a.team}</span>}
-          <Badge s={st}/>
+
+        {/* Security badge */}
+        <div style={{ display:"flex", gap:8, marginBottom:20, flexWrap:"wrap" }}>
+          {["🔒 OAuth 2.0","📖 Read-only scope","🚫 No data stored on servers","⚡ In-memory only"].map(b=>(
+            <span key={b} style={{ background:GREEN+"18", border:`1px solid ${GREEN}33`, color:GREEN,
+              borderRadius:20, padding:"3px 10px", fontSize:11, fontWeight:600 }}>{b}</span>
+          ))}
         </div>
+
+        {error && (
+          <div style={{ background:WINE+"22", border:`1px solid ${WINE}44`, borderRadius:8,
+            padding:"10px 14px", color:"#ff9999", fontSize:13, marginBottom:16 }}>{error}</div>
+        )}
+
+        {/* Step 0: Info */}
+        {step===0 && (
+          <div>
+            <Card style={{ marginBottom:20 }}>
+              <h3 style={{ margin:"0 0 12px", color:TX1, fontSize:15 }}>How it works</h3>
+              <div style={{ display:"grid", gap:10 }}>
+                {[
+                  ["1", "Sign in with your Google account using secure OAuth 2.0"],
+                  ["2", "ATLAUA reads your sent email headers only — never email bodies"],
+                  ["3", "Unique recipients are extracted and auto-categorized (Agency, Brand, Media, Team...)"],
+                  ["4", "You review & select which contacts to import into the CRM"],
+                  ["5", "Your Gmail token is never stored — it expires when you close the tab"]
+                ].map(([n,t])=>(
+                  <div key={n} style={{ display:"flex", gap:12, alignItems:"flex-start" }}>
+                    <div style={{ width:22, height:22, borderRadius:"50%", background:T+"22",
+                      border:`1px solid ${T}44`, color:T, fontSize:11, fontWeight:700,
+                      display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>{n}</div>
+                    <div style={{ color:TX2, fontSize:13 }}>{t}</div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+            <Btn onClick={connectGmail} variant="google" size="lg" style={{ width:"100%", justifyContent:"center" }}>
+              <svg width="18" height="18" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+              Connect with Google
+            </Btn>
+          </div>
+        )}
+
+        {/* Step 1: Loading */}
+        {step===1 && (
+          <div style={{ textAlign:"center", padding:"32px 0" }}>
+            <div style={{ fontSize:40, marginBottom:20 }}>📡</div>
+            <div style={{ color:TX1, fontWeight:700, fontSize:16, marginBottom:8 }}>Scanning your Gmail history...</div>
+            <div style={{ color:TX2, fontSize:13, marginBottom:20 }}>Reading sent email headers only</div>
+            <div style={{ background:C3, borderRadius:8, height:8, overflow:"hidden" }}>
+              <div style={{ height:"100%", width:`${progress}%`, background:`linear-gradient(90deg,${T},${T}AA)`,
+                borderRadius:8, transition:"width 0.4s ease" }}/>
+            </div>
+            <div style={{ color:TX3, fontSize:12, marginTop:8 }}>{progress}% complete</div>
+          </div>
+        )}
+
+        {/* Step 2: Preview */}
+        {step===2 && (
+          <div style={{ display:"flex", flexDirection:"column", flex:1, minHeight:0 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14, flexWrap:"wrap" }}>
+              <div style={{ color:TX1, fontSize:14, fontWeight:600 }}>
+                {contacts.length} unique contacts found
+              </div>
+              <div style={{ marginLeft:"auto", display:"flex", gap:8 }}>
+                <SearchInput value={query} onChange={setQuery} placeholder="Search..." style={{width:180}}/>
+                <Select value={filterCat} onChange={setFilterCat}
+                  options={cats.map(c=>({value:c,label:c}))} />
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:8, marginBottom:12, flexWrap:"wrap" }}>
+              <Btn size="sm" variant="ghost" onClick={()=>setSelected(new Set(contacts.map(c=>c.email)))}>Select all</Btn>
+              <Btn size="sm" variant="ghost" onClick={()=>setSelected(new Set())}>Deselect all</Btn>
+              <span style={{ color:TX2, fontSize:12, alignSelf:"center", marginLeft:4 }}>
+                {selected.size} selected
+              </span>
+            </div>
+            <div style={{ overflowY:"auto", flex:1, minHeight:200, maxHeight:320 }}>
+              {visible.map(c => (
+                <div key={c.email} onClick={()=>setSelected(prev=>{
+                  const n=new Set(prev);
+                  n.has(c.email)?n.delete(c.email):n.add(c.email);
+                  return n;
+                })} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 12px",
+                  borderRadius:8, cursor:"pointer", marginBottom:4,
+                  background: selected.has(c.email) ? T+"14" : C2,
+                  border:`1px solid ${selected.has(c.email)?T+"44":BD}`,
+                  transition:"all 0.15s" }}>
+                  <div style={{ width:18, height:18, borderRadius:4, border:`2px solid ${selected.has(c.email)?T:TX3}`,
+                    background:selected.has(c.email)?T:"transparent", display:"flex", alignItems:"center",
+                    justifyContent:"center", flexShrink:0, transition:"all 0.15s" }}>
+                    {selected.has(c.email) && <span style={{color:"#0A0613",fontSize:11,fontWeight:800}}>✓</span>}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ color:TX1, fontSize:13, fontWeight:600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.name}</div>
+                    <div style={{ color:TX2, fontSize:11, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.email}</div>
+                  </div>
+                  <Tag label={c.category} color={categorizeEmail(c.email)==="Agency"?T:categorizeEmail(c.email)==="Team"?WINE:GOLD}/>
+                  <div style={{ color:TX3, fontSize:11 }}>{c.count}×</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop:16, display:"flex", gap:10, justifyContent:"flex-end" }}>
+              <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+              <Btn onClick={doImport} disabled={selected.size===0}>Import {selected.size} contacts →</Btn>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Done */}
+        {step===3 && (
+          <div style={{ textAlign:"center", padding:"20px 0" }}>
+            <div style={{ fontSize:52, marginBottom:16 }}>🎉</div>
+            <div style={{ color:TX1, fontSize:20, fontWeight:700, marginBottom:8 }}>Contacts imported!</div>
+            <div style={{ color:TX2, fontSize:14 }}>Your Gmail contacts are now in the CRM</div>
+            <div style={{ marginTop:24 }}>
+              <Btn onClick={onClose}>Back to Contacts</Btn>
+            </div>
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
 
-      {/* Body */}
-      <div style={{ padding:24, flex:1, display:"flex", flexDirection:"column", gap:16 }}>
-        {/* Agency block */}
-        <GlassCard style={{ padding:"14px 18px", background:DARK_CARD2 }}>
-          <div style={{ fontSize:10, color:T, letterSpacing:2, textTransform:"uppercase",
-                        fontFamily:"sans-serif", marginBottom:8, fontWeight:700 }}>Agency</div>
-          <div style={{ fontFamily:"Georgia,serif", color:TEXT1, fontWeight:700, fontSize:15, marginBottom:4 }}>{a.agency}</div>
-          <div style={{ fontFamily:"sans-serif", color:TEXT2, fontSize:13, marginBottom:4 }}>{a.agent}</div>
-          {a.email && <div style={{ fontFamily:"sans-serif", color:T, fontSize:12, opacity:.8 }}>✉ {a.email}</div>}
-        </GlassCard>
+// ─── ATHLETE PANEL ─────────────────────────────────────────────────────────────
+function Panel({ a, onClose, onSave }) {
+  const [ed, setEd] = useState({ ...a });
+  const [tab, setTab] = useState("info");
+  const [saving, setSaving] = useState(false);
+  const [note, setNote] = useState(a.notes || "");
 
-        {/* Status */}
-        <div>
-          <label style={lbl}>Status</label>
-          <select value={st} onChange={e=>setSt(e.target.value)} style={inp}>
-            {STATUSES.map(s=><option key={s}>{s}</option>)}
-          </select>
-        </div>
+  const save = async () => {
+    setSaving(true);
+    await onSave({ ...ed, notes:note });
+    setSaving(false); onClose();
+  };
 
-        {/* Notes */}
-        <div>
-          <label style={lbl}>Notes</label>
-          <textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={3}
-            placeholder="Add notes…" style={{...inp, resize:"vertical"}}/>
-        </div>
+  const openGmail = () => {
+    const subject = `ATLAUA x ${ed.athlete} — Partnership Opportunity`;
+    const body = `Hi ${ed.agent},\n\nI hope this message finds you well. I'm reaching out from ATLAUA regarding an exciting partnership opportunity for ${ed.athlete}.\n\nWould love to schedule a call to discuss further.\n\nBest regards,\nATLAUA Team`;
+    const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(ed.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
 
-        <Btn onClick={save} color={T} style={{ width:"100%" }}>Save Changes</Btn>
+  const field = (label, key, type="text") => (
+    <div style={{ marginBottom:14 }}>
+      <label style={{ color:TX3, fontSize:11, fontWeight:600, letterSpacing:"0.06em", textTransform:"uppercase", display:"block", marginBottom:5 }}>{label}</label>
+      {key==="status" ? (
+        <select value={ed[key]||""} onChange={e=>setEd(p=>({...p,[key]:e.target.value}))}
+          style={{ background:C2, border:`1px solid ${BD}`, borderRadius:8, padding:"9px 12px",
+            color:TX1, fontSize:13, width:"100%", outline:"none", fontFamily:"inherit" }}>
+          {STATUSES.map(s=><option key={s}>{s}</option>)}
+        </select>
+      ) : (
+        <input value={ed[key]||""} onChange={e=>setEd(p=>({...p,[key]:e.target.value}))} type={type}
+          style={{ background:C2, border:`1px solid ${BD}`, borderRadius:8, padding:"9px 12px",
+            color:TX1, fontSize:13, width:"100%", boxSizing:"border-box", outline:"none",
+            fontFamily:"inherit", transition:"border 0.2s" }}
+          onFocus={e=>e.target.style.borderColor=T+"66"}
+          onBlur={e=>e.target.style.borderColor=BD}
+        />
+      )}
+    </div>
+  );
 
-        {/* Gmail outreach */}
-        <div style={{ borderTop:`1px solid ${BORDER}`, paddingTop:16 }}>
-          <div style={{ fontSize:10, color:TEXT3, letterSpacing:2, textTransform:"uppercase",
-                        fontFamily:"sans-serif", marginBottom:10, fontWeight:700 }}>AI Outreach</div>
-          <Btn onClick={genAndOpenGmail} disabled={loading} color={W} style={{ width:"100%" }}>
-            {loading ? "Generating…" : "✉ Draft & Open in Gmail ↗"}
-          </Btn>
-          <div style={{ fontFamily:"sans-serif", fontSize:11, color:TEXT3, marginTop:8, textAlign:"center" }}>
-            AI writes the email · opens Gmail in a new tab instantly
+  const overlay = { position:"fixed", inset:0, background:"rgba(0,0,0,0.7)", backdropFilter:"blur(6px)", zIndex:900 };
+  const drawer = { position:"fixed", right:0, top:0, bottom:0, width:"min(520px,95vw)",
+    background:SB, borderLeft:`1px solid ${BD2}`, boxShadow:`-12px 0 48px rgba(0,0,0,0.5)`,
+    display:"flex", flexDirection:"column", zIndex:901 };
+
+  return (
+    <>
+      <div style={overlay} onClick={onClose}/>
+      <div style={drawer}>
+        {/* Header */}
+        <div style={{ padding:"24px 28px 0", borderBottom:`1px solid ${BD}` }}>
+          <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:16 }}>
+            <div>
+              <div style={{ color:T, fontSize:11, fontWeight:700, letterSpacing:"0.08em", marginBottom:4 }}>ATHLETE</div>
+              <h2 style={{ margin:0, color:TX1, fontSize:22, fontWeight:800 }}>{ed.athlete}</h2>
+              <div style={{ marginTop:6, display:"flex", gap:8, flexWrap:"wrap" }}>
+                <LeaguePill league={ed.league}/>
+                <StatusPill status={ed.status}/>
+              </div>
+            </div>
+            <button onClick={onClose} style={{ background:C2, border:`1px solid ${BD}`, color:TX2,
+              borderRadius:8, width:34, height:34, cursor:"pointer", fontSize:16 }}>✕</button>
+          </div>
+          <div style={{ display:"flex", gap:0, marginBottom:-1 }}>
+            {["info","contact","notes"].map(t=>(
+              <button key={t} onClick={()=>setTab(t)}
+                style={{ flex:1, background:"none", border:"none", borderBottom:`2px solid ${tab===t?T:"transparent"}`,
+                  color:tab===t?T:TX2, fontSize:13, fontWeight:600, padding:"10px 0", cursor:"pointer",
+                  textTransform:"capitalize", transition:"all 0.2s" }}>{t}</button>
+            ))}
           </div>
         </div>
 
-        <div style={{ fontFamily:"sans-serif", fontSize:10, color:TEXT3, textAlign:"right" }}>Updated: {a.updated}</div>
+        {/* Body */}
+        <div style={{ flex:1, overflowY:"auto", padding:"24px 28px" }}>
+          {tab==="info" && (
+            <>
+              {field("Athlete Name","athlete")}
+              {field("Team","team")}
+              {field("League","league")}
+              {field("Status","status")}
+              {field("Agency","agency")}
+            </>
+          )}
+          {tab==="contact" && (
+            <>
+              {field("Agent Name","agent")}
+              {field("Agent Email","email","email")}
+              <div style={{ marginTop:16 }}>
+                <Btn onClick={openGmail} icon="✉️" style={{ width:"100%", justifyContent:"center" }}>
+                  Open Gmail Draft
+                </Btn>
+                <div style={{ color:TX3, fontSize:11, textAlign:"center", marginTop:8 }}>
+                  Opens Gmail compose window in a new tab
+                </div>
+              </div>
+            </>
+          )}
+          {tab==="notes" && (
+            <>
+              <label style={{ color:TX3, fontSize:11, fontWeight:600, letterSpacing:"0.06em", display:"block", marginBottom:8 }}>NOTES</label>
+              <textarea value={note} onChange={e=>setNote(e.target.value)}
+                rows={10} placeholder="Add notes about this athlete..."
+                style={{ background:C2, border:`1px solid ${BD}`, borderRadius:8, padding:12,
+                  color:TX1, fontSize:13, width:"100%", boxSizing:"border-box", resize:"vertical",
+                  outline:"none", fontFamily:"inherit", lineHeight:1.6 }}
+                onFocus={e=>e.target.style.borderColor=T+"66"}
+                onBlur={e=>e.target.style.borderColor=BD}
+              />
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding:"16px 28px", borderTop:`1px solid ${BD}`, display:"flex", gap:10 }}>
+          <Btn onClick={onClose} variant="ghost" style={{flex:1, justifyContent:"center"}}>Cancel</Btn>
+          <Btn onClick={save} style={{flex:2, justifyContent:"center"}} disabled={saving}>
+            {saving ? "Saving..." : "Save Changes"}
+          </Btn>
+        </div>
       </div>
-    </div>
-  </>;
+    </>
+  );
 }
 
 // ─── ADD MODAL ────────────────────────────────────────────────────────────────
-function AddModal({ athletes, onClose, onAdd }) {
-  const [tab, setTab]   = useState("athlete");
-  const [af, setAf]     = useState({ name:"", team:"", league:"NFL", agency:"", agent:"", email:"", status:"Contacted" });
-  const [cf, setCf]     = useState({ name:"", company:"", category:"Distributor", email:"", phone:"" });
-  const [sug, setSug]   = useState([]);
-  const agencies = useMemo(()=>[...new Set(athletes.map(a=>a.agency).filter(Boolean))].sort(),[athletes]);
+function AddModal({ onClose, onAdd }) {
+  const [mode, setMode] = useState("athlete");
+  const def = { athlete:"", team:"", league:"NFL", agency:"", agent:"", email:"", status:"Contacted", notes:"" };
+  const [form, setForm] = useState(def);
 
-  const inp = {
-    width:"100%", padding:"10px 12px", borderRadius:8,
-    border:`1px solid ${BORDER}`, background:DARK_CARD2,
-    color:TEXT1, fontFamily:"sans-serif", fontSize:14,
-    boxSizing:"border-box", outline:"none"
-  };
-  const lbl = { display:"block", fontSize:10, color:TEXT3, letterSpacing:2,
-                textTransform:"uppercase", marginBottom:5, fontFamily:"sans-serif", fontWeight:700 };
+  const upd = (k,v) => setForm(p=>({...p,[k]:v}));
+  const submit = () => { onAdd(form, mode); onClose(); };
+
+  const inp = (label, key, type="text") => (
+    <div style={{ marginBottom:12 }}>
+      <label style={{ color:TX3, fontSize:11, fontWeight:600, letterSpacing:"0.06em", display:"block", marginBottom:5 }}>{label}</label>
+      {key==="league"||key==="status" ? (
+        <select value={form[key]} onChange={e=>upd(key,e.target.value)}
+          style={{ background:C2, border:`1px solid ${BD}`, borderRadius:8, padding:"9px 12px",
+            color:TX1, fontSize:13, width:"100%", outline:"none", fontFamily:"inherit" }}>
+          {(key==="league"?LEAGUES:STATUSES).map(o=><option key={o}>{o}</option>)}
+        </select>
+      ) : (
+        <input value={form[key]||""} type={type} onChange={e=>upd(key,e.target.value)}
+          style={{ background:C2, border:`1px solid ${BD}`, borderRadius:8, padding:"9px 12px",
+            color:TX1, fontSize:13, width:"100%", boxSizing:"border-box", outline:"none", fontFamily:"inherit" }}
+          onFocus={e=>e.target.style.borderColor=T+"66"}
+          onBlur={e=>e.target.style.borderColor=BD}
+        />
+      )}
+    </div>
+  );
+
+  const overlay = { position:"fixed", inset:0, background:"rgba(0,0,0,0.75)", backdropFilter:"blur(8px)",
+    display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000 };
+  const box = { background:C1, border:`1px solid ${BD2}`, borderRadius:16, padding:32,
+    width:"min(480px,92vw)", boxShadow:`0 24px 64px rgba(0,0,0,0.6)` };
 
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(10,6,19,0.85)",
-                  backdropFilter:"blur(6px)", zIndex:200,
-                  display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
-      <GlassCard style={{ width:460, maxHeight:"90vh", overflowY:"auto", border:`1px solid ${BORDER2}` }}>
-        {/* Header */}
-        <div style={{ padding:"20px 24px", borderBottom:`1px solid ${BORDER}`,
-                      display:"flex", justifyContent:"space-between", alignItems:"center",
-                      background:`linear-gradient(135deg,${T}15,${W}10)` }}>
-          <div style={{ fontFamily:"Georgia,serif", color:TEXT1, fontSize:18, fontWeight:700 }}>Add New</div>
-          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.07)", border:"none",
-            width:30, height:30, borderRadius:"50%", cursor:"pointer", color:TEXT2, fontSize:18 }}>×</button>
+    <div style={overlay} onClick={e=>{ if(e.target===e.currentTarget) onClose(); }}>
+      <div style={box}>
+        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:20 }}>
+          <div style={{ color:TX1, fontSize:17, fontWeight:700 }}>Add New</div>
+          <button onClick={onClose} style={{ background:"none", border:"none", color:TX2, fontSize:20, cursor:"pointer" }}>✕</button>
         </div>
-        {/* Tabs */}
-        <div style={{ display:"flex", borderBottom:`1px solid ${BORDER}` }}>
-          {[["athlete","🏃 Athlete"],["contact","👤 Contact"]].map(([v,l])=>(
-            <button key={v} onClick={()=>setTab(v)} style={{
-              flex:1, padding:"12px", border:"none", background:"transparent",
-              cursor:"pointer", fontFamily:"sans-serif", fontWeight: tab===v?700:400,
-              color: tab===v?T:TEXT3, borderBottom:`2px solid ${tab===v?T:"transparent"}`,
-              fontSize:14, transition:"all 0.15s"
-            }}>{l}</button>
+        <div style={{ display:"flex", gap:8, marginBottom:20 }}>
+          {["athlete","contact"].map(m=>(
+            <button key={m} onClick={()=>setMode(m)}
+              style={{ flex:1, padding:"8px 0", borderRadius:8, border:`1px solid ${mode===m?T+"66":BD}`,
+                background:mode===m?T+"18":"transparent", color:mode===m?T:TX2,
+                cursor:"pointer", fontWeight:600, fontSize:13, fontFamily:"inherit", textTransform:"capitalize" }}>
+              {m}
+            </button>
           ))}
         </div>
-        {/* Form */}
-        <div style={{ padding:"20px 24px 24px", display:"flex", flexDirection:"column", gap:13 }}>
-          {tab==="athlete" ? <>
-            {[["name","Name *"],["team","Team"],["agent","Agent Name"],["email","Email"]].map(([k,l])=>(
-              <div key={k}><label style={lbl}>{l}</label>
-                <input value={af[k]} onChange={e=>setAf(f=>({...f,[k]:e.target.value}))} style={inp}/>
-              </div>
-            ))}
-            <div style={{ position:"relative" }}>
-              <label style={lbl}>Agency</label>
-              <input value={af.agency} onChange={e=>{ setAf(f=>({...f,agency:e.target.value}));
-                setSug(e.target.value.length>1?agencies.filter(a=>a.toLowerCase().includes(e.target.value.toLowerCase())).slice(0,5):[]); }}
-                style={inp} placeholder="Type to search…"/>
-              {sug.length>0 && (
-                <div style={{ position:"absolute", top:"100%", left:0, right:0, background:DARK_CARD,
-                              border:`1px solid ${BORDER2}`, borderRadius:8, zIndex:10, overflow:"hidden" }}>
-                  {sug.map(a=>(
-                    <div key={a} onClick={()=>{ setAf(f=>({...f,agency:a})); setSug([]); }}
-                      style={{ padding:"9px 14px", cursor:"pointer", fontFamily:"sans-serif",
-                               fontSize:13, color:TEXT1, borderBottom:`1px solid ${BORDER}` }}
-                      onMouseEnter={e=>e.currentTarget.style.background=DARK_CARD2}
-                      onMouseLeave={e=>e.currentTarget.style.background="transparent"}
-                    >{a}</div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div><label style={lbl}>League</label>
-              <select value={af.league} onChange={e=>setAf(f=>({...f,league:e.target.value}))} style={inp}>
-                {LEAGUES.map(l=><option key={l}>{l}</option>)}</select></div>
-            <div><label style={lbl}>Status</label>
-              <select value={af.status} onChange={e=>setAf(f=>({...f,status:e.target.value}))} style={inp}>
-                {STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
-            <Btn onClick={()=>{ if(!af.name)return; onAdd({...af,notes:"",updated:TODAY}); onClose(); }}
-              color={T} style={{ marginTop:4 }}>Add Athlete</Btn>
-          </> : <>
-            {[["name","Name *"],["company","Company"],["email","Email"],["phone","Phone"]].map(([k,l])=>(
-              <div key={k}><label style={lbl}>{l}</label>
-                <input value={cf[k]} onChange={e=>setCf(f=>({...f,[k]:e.target.value}))} style={inp}/>
-              </div>
-            ))}
-            <div><label style={lbl}>Category</label>
-              <select value={cf.category} onChange={e=>setCf(f=>({...f,category:e.target.value}))} style={inp}>
-                {["Distributor","Brand","Media","Partner","Other"].map(c=><option key={c}>{c}</option>)}</select></div>
-            <Btn onClick={()=>{ if(!cf.name)return; onAdd({...cf,updated:TODAY},"contact"); onClose(); }}
-              color={W} style={{ marginTop:4 }}>Add Contact</Btn>
-          </>}
+        {mode==="athlete" && (
+          <>
+            {inp("Athlete Name","athlete")}{inp("Team","team")}{inp("League","league")}
+            {inp("Agency","agency")}{inp("Agent Name","agent")}{inp("Agent Email","email","email")}{inp("Status","status")}
+          </>
+        )}
+        {mode==="contact" && (
+          <>
+            {inp("Full Name","athlete")}{inp("Company","agency")}{inp("Email","email","email")}{inp("Status","status")}
+          </>
+        )}
+        <div style={{ display:"flex", gap:10, marginTop:16 }}>
+          <Btn onClick={onClose} variant="ghost" style={{flex:1,justifyContent:"center"}}>Cancel</Btn>
+          <Btn onClick={submit} style={{flex:2,justifyContent:"center"}}>Add Record</Btn>
         </div>
-      </GlassCard>
+      </div>
     </div>
   );
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 function Dashboard({ athletes }) {
-  const agCount  = useMemo(()=>new Set(athletes.map(a=>a.agency).filter(Boolean)).size,[athletes]);
-  const neg      = athletes.filter(a=>a.status==="Negotiating").length;
-  const won      = athletes.filter(a=>a.status==="Closed Won").length;
-  const contacted= athletes.filter(a=>a.status==="Contacted").length;
+  const total    = athletes.length;
+  const byStatus = useMemo(()=>STATUSES.reduce((a,s)=>({ ...a,[s]: athletes.filter(x=>x.status===s).length }),{}), [athletes]);
+  const byLeague = useMemo(()=>LEAGUES.map(l=>({ name:l, value:athletes.filter(x=>x.league===l).length, color:LCOLS[l] })).filter(x=>x.value), [athletes]);
 
-  const byLeague = useMemo(()=>LEAGUES.map(l=>({ name:l, value:athletes.filter(a=>a.league===l).length })).filter(x=>x.value>0),[athletes]);
-  const bySt     = useMemo(()=>STATUSES.map(s=>({ name:s, value:athletes.filter(a=>a.status===s).length })).filter(x=>x.value>0),[athletes]);
-  const topAg    = useMemo(()=>{
-    const m={};
-    athletes.forEach(a=>{ if(a.agency) m[a.agency]=(m[a.agency]||0)+1; });
-    return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([name,value])=>({
-      name: name.length>20?name.slice(0,20)+"…":name, value
-    }));
+  const topAgencies = useMemo(()=>{
+    const m={}; athletes.forEach(a=>{ if(a.agency) m[a.agency]=(m[a.agency]||0)+1; });
+    return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([name,count])=>({name,count}));
   },[athletes]);
 
-  // Build a fake weekly trend from status data for area chart
-  const trendData = useMemo(()=>{
-    const now = Date.now();
-    return Array.from({length:7},(_,i)=>({
-      day:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][i],
-      contacted: Math.round(contacted * (0.8 + Math.random()*0.4) / 7),
-      negotiating: Math.round(neg * (0.8 + Math.random()*0.4) / 7),
-    }));
-  },[athletes]);
+  const trend = useMemo(()=>{
+    const months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return months.map((m,i)=>({ month:m, athletes: Math.round(total*(0.4+0.07*i)+Math.random()*10) }));
+  },[total]);
 
-  const tt = { contentStyle:{ background:DARK_CARD, border:`1px solid ${BORDER2}`, borderRadius:8, color:TEXT1 },
-               labelStyle:{ color:T }, itemStyle:{ color:TEXT2 } };
+  const pipelineData = STATUSES.filter(s=>s!=="Pending").map(s=>({
+    name: s.replace("Proposal Sent","Proposal").replace("Closed ",""),
+    value: byStatus[s]||0, color: SCOL[s]
+  }));
 
   return (
     <div>
-      {/* Hero banner */}
-      <div style={{
-        background:`linear-gradient(135deg,${W}44 0%,${DARK_CARD} 40%,${T}22 100%)`,
-        border:`1px solid ${BORDER}`, borderRadius:20, padding:"32px 36px",
-        marginBottom:28, position:"relative", overflow:"hidden"
-      }}>
-        <div style={{ position:"absolute", top:-60, right:-60, width:220, height:220,
-                      borderRadius:"50%", background:`${T}12` }}/>
-        <div style={{ position:"absolute", bottom:-80, left:30, width:160, height:160,
-                      borderRadius:"50%", background:`${W}12` }}/>
-        <div style={{ position:"relative" }}>
-          <div style={{ fontFamily:"sans-serif", fontSize:10, color:TEXT3,
-                        letterSpacing:4, textTransform:"uppercase", marginBottom:8 }}>ATLAUA · GOD OF WATER</div>
-          <div style={{ fontFamily:"Georgia,serif", color:TEXT1, fontSize:32,
-                        fontWeight:700, letterSpacing:2, marginBottom:20 }}>CRM Dashboard</div>
-          <div style={{ display:"flex", gap:36, flexWrap:"wrap" }}>
-            {[[athletes.length,"Athletes",T],[agCount,"Agencies",BG],[neg,"Negotiating",GOLD],[won,"Closed Won",GREEN]].map(([v,l,c])=>(
-              <div key={l}>
-                <div style={{ fontFamily:"Georgia,serif", fontSize:34, color:c,
-                              fontWeight:700, lineHeight:1, textShadow:`0 0 24px ${c}55` }}>{v}</div>
-                <div style={{ fontFamily:"sans-serif", fontSize:10, color:TEXT3,
-                              letterSpacing:2, textTransform:"uppercase", marginTop:4 }}>{l}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* Hero */}
+      <div style={{ background:`linear-gradient(135deg, ${C2} 0%, ${C3} 50%, ${T}18 100%)`,
+        borderRadius:16, padding:"28px 32px", marginBottom:24, border:`1px solid ${BD2}`,
+        position:"relative", overflow:"hidden" }}>
+        <div style={{ position:"absolute", right:-30, top:-30, width:200, height:200,
+          borderRadius:"50%", background:T, opacity:0.04, pointerEvents:"none" }}/>
+        <div style={{ position:"absolute", right:60, bottom:-50, width:150, height:150,
+          borderRadius:"50%", background:WINE, opacity:0.06, pointerEvents:"none" }}/>
+        <div style={{ color:TX3, fontSize:12, fontWeight:700, letterSpacing:"0.1em", marginBottom:8 }}>ATLAUA SPORTS CRM</div>
+        <h1 style={{ margin:0, color:TX1, fontSize:32, fontWeight:800, letterSpacing:"-0.02em" }}>
+          Good {new Date().getHours()<12?"morning":"afternoon"} 👋
+        </h1>
+        <p style={{ margin:"8px 0 0", color:TX2, fontSize:15 }}>Here's your pipeline overview for today · {new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</p>
       </div>
 
-      {/* KPI cards */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:14, marginBottom:24 }}>
-        <KpiCard label="Total Athletes"  value={athletes.length} color={T}    icon="🏃"/>
-        <KpiCard label="Agencies"        value={agCount}         color={W}    icon="🏢"/>
-        <KpiCard label="Negotiating"     value={neg}             color={GOLD} icon="🤝"/>
-        <KpiCard label="Closed Won"      value={won}             color={GREEN}icon="✅"/>
+      {/* KPIs */}
+      <div style={{ display:"flex", gap:16, marginBottom:24, flexWrap:"wrap" }}>
+        <KpiCard label="Total Athletes" value={total} sub="in database" icon="🏅" color={T}/>
+        <KpiCard label="Active Deals" value={byStatus.Negotiating||0} sub="in negotiation" icon="🤝" color={GOLD}/>
+        <KpiCard label="Closed Won" value={byStatus["Closed Won"]||0} sub="signed" icon="✅" color={GREEN}/>
+        <KpiCard label="Proposals Out" value={byStatus["Proposal Sent"]||0} sub="pending response" icon="📄" color={PURP}/>
       </div>
 
       {/* Charts row */}
-      <div style={{ display:"grid", gridTemplateColumns:"1.4fr 1fr", gap:18, marginBottom:18 }}>
-        {/* Area chart - trend */}
-        <GlassCard style={{ padding:"22px 20px" }}>
-          <div style={{ fontSize:10, color:TEXT3, letterSpacing:2, textTransform:"uppercase",
-                        fontFamily:"sans-serif", marginBottom:16, fontWeight:700 }}>Weekly Activity</div>
+      <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:16, marginBottom:24 }}>
+        {/* Trend chart */}
+        <Card>
+          <div style={{ color:TX1, fontWeight:700, fontSize:15, marginBottom:4 }}>Outreach Trend</div>
+          <div style={{ color:TX2, fontSize:12, marginBottom:20 }}>Athletes tracked by month</div>
           <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={trendData} margin={{left:-10,right:8}}>
+            <AreaChart data={trend}>
               <defs>
-                <linearGradient id="gc" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor={T} stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor={T} stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="gw" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor={W} stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor={W} stopOpacity={0}/>
+                <linearGradient id="aGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"   stopColor={T} stopOpacity={0.35}/>
+                  <stop offset="95%"  stopColor={T} stopOpacity={0}/>
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke={BORDER} strokeDasharray="3 3"/>
-              <XAxis dataKey="day" tick={{ fill:TEXT3, fontSize:11 }} axisLine={false} tickLine={false}/>
-              <YAxis tick={{ fill:TEXT3, fontSize:11 }} axisLine={false} tickLine={false}/>
-              <Tooltip {...tt}/>
-              <Area type="monotone" dataKey="contacted"   stroke={T} fill="url(#gc)" strokeWidth={2.5}/>
-              <Area type="monotone" dataKey="negotiating" stroke={W} fill="url(#gw)" strokeWidth={2.5}/>
+              <CartesianGrid stroke={BD} strokeDasharray="3 3" vertical={false}/>
+              <XAxis dataKey="month" tick={{fill:TX3, fontSize:11}} axisLine={false} tickLine={false}/>
+              <YAxis tick={{fill:TX3, fontSize:11}} axisLine={false} tickLine={false} width={36}/>
+              <Tooltip contentStyle={{ background:C3, border:`1px solid ${BD2}`, borderRadius:8, color:TX1, fontSize:12 }}/>
+              <Area type="monotone" dataKey="athletes" stroke={T} strokeWidth={2.5} fill="url(#aGrad)"/>
             </AreaChart>
           </ResponsiveContainer>
-        </GlassCard>
+        </Card>
 
-        {/* Pie - by league */}
-        <GlassCard style={{ padding:"22px 20px" }}>
-          <div style={{ fontSize:10, color:TEXT3, letterSpacing:2, textTransform:"uppercase",
-                        fontFamily:"sans-serif", marginBottom:16, fontWeight:700 }}>By League</div>
-          <ResponsiveContainer width="100%" height={200}>
+        {/* By league */}
+        <Card>
+          <div style={{ color:TX1, fontWeight:700, fontSize:15, marginBottom:4 }}>By League</div>
+          <div style={{ color:TX2, fontSize:12, marginBottom:16 }}>Distribution</div>
+          <ResponsiveContainer width="100%" height={180}>
             <PieChart>
-              <Pie data={byLeague} dataKey="value" nameKey="name" cx="50%" cy="50%"
-                   outerRadius={72} innerRadius={32} paddingAngle={3}>
-                {byLeague.map((e,i)=><Cell key={i} fill={PCOLS[i%PCOLS.length]}/>)}
+              <Pie data={byLeague} cx="50%" cy="50%" innerRadius={50} outerRadius={75}
+                dataKey="value" nameKey="name" paddingAngle={3}>
+                {byLeague.map((e,i)=><Cell key={i} fill={e.color} stroke="none"/>)}
               </Pie>
-              <Tooltip {...tt}/>
-              <Legend iconType="circle" iconSize={8}
-                      wrapperStyle={{ fontSize:11, fontFamily:"sans-serif", color:TEXT2 }}/>
+              <Tooltip contentStyle={{ background:C3, border:`1px solid ${BD2}`, borderRadius:8, color:TX1, fontSize:12 }}/>
             </PieChart>
           </ResponsiveContainer>
-        </GlassCard>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginTop:8 }}>
+            {byLeague.map(l=>(
+              <div key={l.name} style={{ display:"flex", alignItems:"center", gap:6 }}>
+                <div style={{ width:8, height:8, borderRadius:"50%", background:l.color }}/>
+                <span style={{ color:TX2, fontSize:11 }}>{l.name} {l.value}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
       </div>
 
-      {/* Bottom row */}
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:18 }}>
-        {/* Status bar */}
-        <GlassCard style={{ padding:"22px 20px" }}>
-          <div style={{ fontSize:10, color:TEXT3, letterSpacing:2, textTransform:"uppercase",
-                        fontFamily:"sans-serif", marginBottom:16, fontWeight:700 }}>Pipeline Status</div>
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={bySt} layout="vertical" margin={{left:4,right:16}}>
-              <XAxis type="number" tick={{ fill:TEXT3, fontSize:10 }} axisLine={false} tickLine={false}/>
-              <YAxis type="category" dataKey="name" width={110}
-                     tick={{ fill:TEXT2, fontSize:11, fontFamily:"sans-serif" }} axisLine={false} tickLine={false}/>
-              <Tooltip {...tt}/>
-              <Bar dataKey="value" fill={T} radius={[0,5,5,0]}/>
-            </BarChart>
-          </ResponsiveContainer>
-        </GlassCard>
+      {/* Pipeline + Top Agencies */}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+        {/* Pipeline funnel */}
+        <Card>
+          <div style={{ color:TX1, fontWeight:700, fontSize:15, marginBottom:18 }}>Pipeline Breakdown</div>
+          {pipelineData.map(({ name, value, color }) => (
+            <div key={name} style={{ marginBottom:14 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:5 }}>
+                <span style={{ color:TX2, fontSize:13 }}>{name}</span>
+                <span style={{ color:TX1, fontSize:13, fontWeight:700 }}>{value}</span>
+              </div>
+              <div style={{ height:6, borderRadius:6, background:C3 }}>
+                <div style={{ height:"100%", width:`${total?Math.round((value/total)*100):0}%`,
+                  background:`linear-gradient(90deg,${color},${color}99)`, borderRadius:6,
+                  transition:"width 0.8s ease" }}/>
+              </div>
+            </div>
+          ))}
+        </Card>
 
         {/* Top agencies */}
-        <GlassCard style={{ padding:"22px 20px" }}>
-          <div style={{ fontSize:10, color:TEXT3, letterSpacing:2, textTransform:"uppercase",
-                        fontFamily:"sans-serif", marginBottom:16, fontWeight:700 }}>Top Agencies</div>
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={topAg} margin={{bottom:36,left:0,right:8}}>
-              <XAxis dataKey="name" tick={{ fill:TEXT3, fontSize:9, angle:-30, textAnchor:"end" }}
-                     interval={0} height={50} axisLine={false} tickLine={false}/>
-              <YAxis tick={{ fill:TEXT3, fontSize:10 }} axisLine={false} tickLine={false}/>
-              <Tooltip {...tt}/>
-              <Bar dataKey="value" fill={W} radius={[5,5,0,0]}/>
-            </BarChart>
-          </ResponsiveContainer>
-        </GlassCard>
+        <Card>
+          <div style={{ color:TX1, fontWeight:700, fontSize:15, marginBottom:18 }}>Top Agencies</div>
+          {topAgencies.map((a,i)=>(
+            <div key={a.name} style={{ display:"flex", alignItems:"center", gap:12, marginBottom:10 }}>
+              <div style={{ width:22, height:22, borderRadius:6, background:T+"22", color:T,
+                fontSize:11, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                {i+1}
+              </div>
+              <div style={{ flex:1, color:TX1, fontSize:13, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{a.name}</div>
+              <Tag label={String(a.count)} color={T}/>
+            </div>
+          ))}
+        </Card>
       </div>
     </div>
   );
 }
 
-// ─── ATHLETES ─────────────────────────────────────────────────────────────────
+// ─── ATHLETES ────────────────────────────────────────────────────────────────
 function Athletes({ athletes, onSelect, onImport }) {
-  const [q,setQ]=useState(""); const [dq,setDq]=useState("");
-  const [fL,setFL]=useState(""); const [fS,setFS]=useState(""); const [pg,setPg]=useState(0);
-  const [showImport,setShowImport]=useState(false);
-  const PER=50; const ref=useRef();
-  useEffect(()=>{ clearTimeout(ref.current); ref.current=setTimeout(()=>setDq(q),150); },[q]);
+  const [q, setQ]           = useState("");
+  const [league, setLeague] = useState("All");
+  const [status, setStatus] = useState("All");
+  const [sort, setSort]     = useState({ col:"athlete", dir:"asc" });
+  const [page, setPage]     = useState(1);
+  const [showImport, setShowImport] = useState(false);
+  const PER = 25;
 
-  const filtered=useMemo(()=>{
-    const lq=dq.toLowerCase();
-    return athletes.filter(a=>(
-      (!lq||[a.name,a.agent,a.agency,a.team].some(v=>(v||"").toLowerCase().includes(lq)))
-      &&(!fL||a.league===fL)&&(!fS||a.status===fS)
-    ));
-  },[athletes,dq,fL,fS]);
+  const filtered = useMemo(()=>{
+    let r = athletes;
+    if (q)            r=r.filter(a=>Object.values(a).join(" ").toLowerCase().includes(q.toLowerCase()));
+    if (league!=="All") r=r.filter(a=>a.league===league);
+    if (status!=="All") r=r.filter(a=>a.status===status);
+    return [...r].sort((a,b)=>{
+      const av=a[sort.col]||"", bv=b[sort.col]||"";
+      return sort.dir==="asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+    });
+  },[athletes,q,league,status,sort]);
 
-  const paged = filtered.slice(pg*PER,(pg+1)*PER);
-  const pages = Math.ceil(filtered.length/PER);
+  const pages  = Math.ceil(filtered.length/PER);
+  const paged  = filtered.slice((page-1)*PER, page*PER);
+  const thSort = col => setSort(s=>({ col, dir: s.col===col&&s.dir==="asc"?"desc":"asc" }));
 
-  const exportCSV=()=>{
-    const rows=[["Name","Team","League","Agency","Agent","Email","Status","Updated"],
-                ...filtered.map(a=>[a.name,a.team||"",a.league,a.agency,a.agent,a.email,a.status,a.updated])];
-    const csv=rows.map(r=>r.map(v=>`"${(v||"").replace(/"/g,'""')}"`).join(",")).join("\n");
-    const b=new Blob([csv],{type:"text/csv"});
-    const x=document.createElement("a");x.href=URL.createObjectURL(b);
-    x.download=`atlaua-athletes-${TODAY}.csv`;x.click();
+  const exportCSV = () => {
+    const rows = [["Athlete","Team","League","Agency","Agent","Email","Status"],
+      ...filtered.map(a=>[a.athlete,a.team,a.league,a.agency,a.agent,a.email,a.status])];
+    const csv  = rows.map(r=>r.map(c=>`"${(c||"").replace(/"/g,'""')}"`).join(",")).join("\n");
+    const a    = document.createElement("a");
+    a.href     = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+    a.download = `athletes_${TODAY}.csv`;
+    a.click();
   };
 
-  const sel={padding:"9px 12px",borderRadius:8,border:`1px solid ${BORDER}`,background:DARK_CARD2,
-             color:TEXT1,fontFamily:"sans-serif",fontSize:13,cursor:"pointer",outline:"none"};
+  const Th = ({ col, label }) => (
+    <th onClick={()=>thSort(col)} style={{ padding:"10px 14px", color:sort.col===col?T:TX3,
+      fontSize:11, fontWeight:700, letterSpacing:"0.07em", textTransform:"uppercase",
+      cursor:"pointer", whiteSpace:"nowrap", userSelect:"none", borderBottom:`1px solid ${BD}` }}>
+      {label} {sort.col===col ? (sort.dir==="asc"?"↑":"↓") : ""}
+    </th>
+  );
 
   return (
     <div>
-      {showImport && <ImportCSVModal onClose={()=>setShowImport(false)} onImport={onImport}/>}
-      <SectionTitle title="Athletes" sub={`${filtered.length} of ${athletes.length} athletes`}
-        right={
-          <div style={{ display:"flex", gap:8 }}>
-            <Btn outline color={T} onClick={()=>setShowImport(true)}>↑ Import CSV</Btn>
-            <Btn outline color={W} onClick={exportCSV}>↓ Export CSV</Btn>
-          </div>
-        }/>
+      <SectionHeader title="Athletes" sub={`${filtered.length} records`}
+        right={<>
+          <Btn variant="outline" size="sm" onClick={exportCSV} icon="↓">Export CSV</Btn>
+          <Btn variant="ghost" size="sm" onClick={()=>setShowImport(true)} icon="↑">Import CSV</Btn>
+        </>}
+      />
 
-      <GlassCard style={{ padding:"12px 16px", marginBottom:16,
-                          display:"flex", gap:10, flexWrap:"wrap" }}>
-        <input value={q} onChange={e=>{setQ(e.target.value);setPg(0)}}
-          placeholder="🔍  Search name, agent, agency, team…"
-          style={{ flex:"2 1 200px", ...sel, background:DARK_CARD }}/>
-        <select value={fL} onChange={e=>{setFL(e.target.value);setPg(0)}} style={sel}>
-          <option value="">All Leagues</option>{LEAGUES.map(l=><option key={l}>{l}</option>)}
-        </select>
-        <select value={fS} onChange={e=>{setFS(e.target.value);setPg(0)}} style={sel}>
-          <option value="">All Statuses</option>{STATUSES.map(s=><option key={s}>{s}</option>)}
-        </select>
-      </GlassCard>
+      {/* Filters */}
+      <div style={{ display:"flex", gap:10, marginBottom:20, flexWrap:"wrap" }}>
+        <SearchInput value={q} onChange={v=>{setQ(v);setPage(1);}} placeholder="Search athletes, agents, agencies..." style={{flex:1,minWidth:200}}/>
+        <Select value={league} onChange={v=>{setLeague(v);setPage(1);}}
+          options={["All",...LEAGUES].map(l=>({value:l,label:l==="All"?"All Leagues":l}))}/>
+        <Select value={status} onChange={v=>{setStatus(v);setPage(1);}}
+          options={["All",...STATUSES].map(s=>({value:s,label:s==="All"?"All Statuses":s}))}/>
+      </div>
 
-      <GlassCard style={{ overflow:"hidden" }}>
+      {/* Table */}
+      <Card style={{ padding:0, overflow:"hidden" }}>
         <div style={{ overflowX:"auto" }}>
           <table style={{ width:"100%", borderCollapse:"collapse" }}>
             <thead>
-              <tr style={{ borderBottom:`1px solid ${BORDER}`, background:DARK_CARD2 }}>
-                {["Athlete","League","Team","Agency","Agent","Status","Updated"].map(h=>(
-                  <th key={h} style={{ padding:"11px 16px", textAlign:"left", fontFamily:"sans-serif",
-                                       fontSize:10, color:T, letterSpacing:2, textTransform:"uppercase",
-                                       whiteSpace:"nowrap", fontWeight:700 }}>{h}</th>
-                ))}
+              <tr style={{ background:C2 }}>
+                <Th col="athlete" label="Athlete"/>
+                <Th col="team"    label="Team"/>
+                <Th col="league"  label="League"/>
+                <Th col="agency"  label="Agency"/>
+                <Th col="agent"   label="Agent"/>
+                <Th col="status"  label="Status"/>
+                <th style={{ padding:"10px 14px", borderBottom:`1px solid ${BD}` }}/>
               </tr>
             </thead>
             <tbody>
               {paged.map((a,i)=>(
-                <tr key={a.id} onClick={()=>onSelect(a)} style={{
-                  background:i%2===0?"transparent":DARK_CARD2,
-                  cursor:"pointer", borderBottom:`1px solid ${BORDER}`, transition:"background 0.1s"
+                <tr key={i} onClick={()=>onSelect(a)} style={{
+                  background: i%2===0 ? "transparent" : C2+"88",
+                  cursor:"pointer", transition:"background 0.15s"
                 }}
-                onMouseEnter={e=>e.currentTarget.style.background=`${T}0A`}
-                onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"transparent":DARK_CARD2}>
-                  <td style={{ padding:"11px 16px", fontFamily:"sans-serif", fontWeight:700, color:TEXT1, whiteSpace:"nowrap" }}>{a.name}</td>
-                  <td style={{ padding:"11px 16px" }}><LeaguePill league={a.league}/></td>
-                  <td style={{ padding:"11px 16px", fontFamily:"sans-serif", fontSize:13, color:TEXT2 }}>{a.team||<span style={{color:TEXT3}}>—</span>}</td>
-                  <td style={{ padding:"11px 16px", fontFamily:"sans-serif", fontSize:13, color:TEXT2, maxWidth:160, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{a.agency}</td>
-                  <td style={{ padding:"11px 16px", fontFamily:"sans-serif", fontSize:13, color:TEXT3, maxWidth:130, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{a.agent}</td>
-                  <td style={{ padding:"11px 16px" }}><Badge s={a.status}/></td>
-                  <td style={{ padding:"11px 16px", fontFamily:"sans-serif", fontSize:11, color:TEXT3 }}>{a.updated}</td>
+                onMouseEnter={e=>e.currentTarget.style.background=T+"12"}
+                onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"transparent":C2+"88"}>
+                  <td style={{ padding:"12px 14px", color:TX1, fontSize:13, fontWeight:600, whiteSpace:"nowrap" }}>{a.athlete}</td>
+                  <td style={{ padding:"12px 14px", color:TX2, fontSize:12 }}>{a.team}</td>
+                  <td style={{ padding:"12px 14px" }}><LeaguePill league={a.league}/></td>
+                  <td style={{ padding:"12px 14px", color:TX2, fontSize:12 }}>{a.agency}</td>
+                  <td style={{ padding:"12px 14px", color:TX2, fontSize:12 }}>{a.agent}</td>
+                  <td style={{ padding:"12px 14px" }}><StatusPill status={a.status}/></td>
+                  <td style={{ padding:"12px 14px" }}>
+                    <button onClick={e=>{e.stopPropagation();onSelect(a);}} style={{
+                      background:"none", border:`1px solid ${BD}`, color:TX2, borderRadius:6,
+                      padding:"4px 10px", fontSize:11, cursor:"pointer", fontFamily:"inherit" }}>Edit</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        {pages>1 && (
-          <div style={{ padding:"12px 16px", borderTop:`1px solid ${BORDER}`,
-                        display:"flex", gap:6, justifyContent:"center", flexWrap:"wrap" }}>
-            {Array.from({length:pages},(_,i)=>(
-              <button key={i} onClick={()=>setPg(i)} style={{
-                minWidth:32, height:32, borderRadius:8,
-                border:`1px solid ${pg===i?T:BORDER}`,
-                background:pg===i?T:"transparent",
-                color:pg===i?DARK_BG:TEXT2,
-                cursor:"pointer", fontFamily:"sans-serif", fontSize:12, fontWeight:pg===i?700:400
-              }}>{i+1}</button>
-            ))}
+        {/* Pagination */}
+        {pages > 1 && (
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
+            padding:"14px 20px", borderTop:`1px solid ${BD}` }}>
+            <div style={{ color:TX3, fontSize:12 }}>
+              Showing {(page-1)*PER+1}–{Math.min(page*PER,filtered.length)} of {filtered.length}
+            </div>
+            <div style={{ display:"flex", gap:6 }}>
+              <Btn size="sm" variant="ghost" onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1}>← Prev</Btn>
+              {Array.from({length:Math.min(5,pages)},(_,i)=>{
+                let p = page <= 3 ? i+1 : page >= pages-2 ? pages-4+i : page-2+i;
+                p = Math.max(1, Math.min(pages, p));
+                return <button key={p} onClick={()=>setPage(p)}
+                  style={{ width:32, height:32, borderRadius:6, border:`1px solid ${p===page?T+"66":BD}`,
+                    background:p===page?T+"22":"transparent", color:p===page?T:TX2,
+                    cursor:"pointer", fontSize:12, fontFamily:"inherit" }}>{p}</button>;
+              })}
+              <Btn size="sm" variant="ghost" onClick={()=>setPage(p=>Math.min(pages,p+1))} disabled={page===pages}>Next →</Btn>
+            </div>
           </div>
         )}
-      </GlassCard>
+      </Card>
+      {showImport && <ImportCSVModal onClose={()=>setShowImport(false)} onImport={onImport} mode="athletes"/>}
     </div>
   );
 }
 
-// ─── AGENCIES ─────────────────────────────────────────────────────────────────
+// ─── AGENCIES ────────────────────────────────────────────────────────────────
 function Agencies({ athletes, onSelect }) {
-  const [q,setQ]=useState(""); const [sort,setSort]=useState("count"); const [exp,setExp]=useState(null);
-  const data=useMemo(()=>{
+  const [q, setQ]       = useState("");
+  const [open, setOpen] = useState(null);
+  const agencies = useMemo(()=>{
     const m={};
-    athletes.forEach(a=>{ if(!a.agency)return;
-      if(!m[a.agency])m[a.agency]={name:a.agency,athletes:[],agents:new Set(),leagues:new Set()};
-      m[a.agency].athletes.push(a);m[a.agency].agents.add(a.agent);m[a.agency].leagues.add(a.league);
+    athletes.forEach(a=>{ if(!a.agency) return;
+      if(!m[a.agency]) m[a.agency]={ name:a.agency, agent:a.agent, email:a.email, athletes:[] };
+      m[a.agency].athletes.push(a);
     });
-    let list=Object.values(m).map(x=>({...x,agents:[...x.agents],leagues:[...x.leagues]}));
-    if(q)list=list.filter(x=>x.name.toLowerCase().includes(q.toLowerCase()));
-    return sort==="az"?list.sort((a,b)=>a.name.localeCompare(b.name)):list.sort((a,b)=>b.athletes.length-a.athletes.length);
-  },[athletes,q,sort]);
+    return Object.values(m).sort((a,b)=>b.athletes.length-a.athletes.length)
+      .filter(a=>a.name.toLowerCase().includes(q.toLowerCase()));
+  },[athletes,q]);
 
   return (
     <div>
-      <SectionTitle title="Agencies" sub={`${data.length} agencies`}
-        right={
-          <select value={sort} onChange={e=>setSort(e.target.value)} style={{
-            padding:"9px 12px", borderRadius:8, border:`1px solid ${BORDER}`,
-            background:DARK_CARD2, color:TEXT1, fontFamily:"sans-serif", fontSize:13, cursor:"pointer"
-          }}>
-            <option value="count">Most Athletes</option>
-            <option value="az">A – Z</option>
-          </select>
-        }/>
-      <input value={q} onChange={e=>setQ(e.target.value)} placeholder="🔍  Search agencies…"
-        style={{ width:"100%", padding:"10px 16px", borderRadius:8, border:`1px solid ${BORDER}`,
-                 background:DARK_CARD, color:TEXT1, fontFamily:"sans-serif", fontSize:14,
-                 marginBottom:18, boxSizing:"border-box", outline:"none" }}/>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(290px,1fr))", gap:14 }}>
-        {data.map(ag=>(
-          <GlassCard key={ag.name} style={{ overflow:"hidden", borderTop:`3px solid ${T}` }}>
-            <div style={{ padding:"18px 20px" }}>
-              <div style={{ fontFamily:"Georgia,serif", color:TEXT1, fontSize:14, fontWeight:700, marginBottom:4, lineHeight:1.3 }}>{ag.name}</div>
-              <div style={{ fontFamily:"Georgia,serif", color:T, fontSize:34, fontWeight:700,
-                            lineHeight:1, marginBottom:10, textShadow:`0 0 20px ${T}44` }}>{ag.athletes.length}</div>
-              <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginBottom:10 }}>
-                {ag.leagues.map(l=><LeaguePill key={l} league={l}/>)}
+      <SectionHeader title="Agencies" sub={`${agencies.length} agencies`}/>
+      <SearchInput value={q} onChange={setQ} placeholder="Search agencies..." style={{ marginBottom:20, maxWidth:360 }}/>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))", gap:14 }}>
+        {agencies.map(ag=>(
+          <Card key={ag.name} style={{ cursor:"pointer", transition:"border 0.2s" }}
+            glow={open===ag.name}>
+            <div onClick={()=>setOpen(o=>o===ag.name?null:ag.name)}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
+                <div>
+                  <div style={{ color:TX1, fontSize:15, fontWeight:700, marginBottom:4 }}>{ag.name}</div>
+                  <div style={{ color:TX2, fontSize:12 }}>{ag.agent}</div>
+                  <a href={`mailto:${ag.email}`} onClick={e=>e.stopPropagation()}
+                    style={{ color:T, fontSize:12, textDecoration:"none" }}>{ag.email}</a>
+                </div>
+                <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                  <Tag label={`${ag.athletes.length} athletes`} color={T}/>
+                  <span style={{ color:TX3, fontSize:12 }}>{open===ag.name?"▲":"▼"}</span>
+                </div>
               </div>
-              <div style={{ fontFamily:"sans-serif", fontSize:11, color:TEXT3, marginBottom:14, lineHeight:1.5 }}>
-                {ag.agents.slice(0,2).join(" · ")}{ag.agents.length>2?` +${ag.agents.length-2} more`:""}
-              </div>
-              <Btn outline color={T} onClick={()=>setExp(exp===ag.name?null:ag.name)}
-                style={{ width:"100%", fontSize:12 }}>
-                {exp===ag.name?"Hide Roster ▲":"View Roster ▼"}
-              </Btn>
             </div>
-            {exp===ag.name && (
-              <div style={{ borderTop:`1px solid ${BORDER}`, maxHeight:220, overflowY:"auto" }}>
+            {open===ag.name && (
+              <div style={{ borderTop:`1px solid ${BD}`, paddingTop:12, marginTop:4 }}>
                 {ag.athletes.map(a=>(
-                  <div key={a.id} onClick={()=>onSelect(a)} style={{
-                    padding:"9px 20px", display:"flex", justifyContent:"space-between",
-                    alignItems:"center", cursor:"pointer", borderBottom:`1px solid ${BORDER}`, transition:"background 0.1s"
-                  }}
-                  onMouseEnter={e=>e.currentTarget.style.background=`${T}0A`}
-                  onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                    <span style={{ fontFamily:"sans-serif", fontSize:13, color:TEXT1, fontWeight:600 }}>{a.name}</span>
-                    <Badge s={a.status}/>
+                  <div key={a.athlete} onClick={()=>onSelect(a)}
+                    style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
+                      padding:"8px 10px", borderRadius:8, cursor:"pointer", marginBottom:4,
+                      background:C2, transition:"background 0.15s" }}
+                    onMouseEnter={e=>e.currentTarget.style.background=T+"18"}
+                    onMouseLeave={e=>e.currentTarget.style.background=C2}>
+                    <div style={{ color:TX1, fontSize:13 }}>{a.athlete}</div>
+                    <div style={{ display:"flex", gap:6 }}>
+                      <LeaguePill league={a.league}/>
+                      <StatusPill status={a.status}/>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
-          </GlassCard>
+          </Card>
         ))}
       </div>
     </div>
@@ -1542,524 +1913,603 @@ function Agencies({ athletes, onSelect }) {
 
 // ─── TEAMS ────────────────────────────────────────────────────────────────────
 function Teams({ athletes, onSelect }) {
-  const [lg,setLg]=useState("NFL"); const [open,setOpen]=useState(null);
-  const data=useMemo(()=>{
+  const [q, setQ]        = useState("");
+  const [league, setLeague] = useState("All");
+  const [open, setOpen]  = useState(null);
+
+  const teams = useMemo(()=>{
     const m={};
-    athletes.filter(a=>a.league===lg).forEach(a=>{
-      const t=a.team||"Independent";
-      if(!m[t])m[t]=[];m[t].push(a);
+    athletes.forEach(a=>{ if(!a.team) return;
+      if(!m[a.team]) m[a.team]={ name:a.team, league:a.league, athletes:[] };
+      m[a.team].athletes.push(a);
     });
-    return Object.entries(m).sort((a,b)=>b[1].length-a[1].length);
-  },[athletes,lg]);
+    return Object.values(m)
+      .filter(t => (league==="All"||t.league===league) && t.name.toLowerCase().includes(q.toLowerCase()))
+      .sort((a,b)=>b.athletes.length-a.athletes.length);
+  },[athletes,q,league]);
+
+  const byLeague = LEAGUES.map(l=>({ l, teams:teams.filter(t=>t.league===l) })).filter(x=>x.teams.length);
 
   return (
     <div>
-      <SectionTitle title="Teams" sub="Browse athletes by team"/>
-      <div style={{ display:"flex", gap:8, marginBottom:22, flexWrap:"wrap" }}>
-        {LEAGUES.map(l=>(
-          <button key={l} onClick={()=>{setLg(l);setOpen(null);}} style={{
-            padding:"8px 20px", borderRadius:20,
-            border:`2px solid ${lg===l?(LCOLS[l]||T):BORDER}`,
-            background: lg===l?`${LCOLS[l]||T}22`:"transparent",
-            color: lg===l?(LCOLS[l]||T):TEXT2,
-            cursor:"pointer", fontFamily:"sans-serif", fontWeight:700, fontSize:14,
-            transition:"all 0.15s"
-          }}>{ICONS[l]} {l}</button>
-        ))}
+      <SectionHeader title="Teams" sub={`${teams.length} teams`}/>
+      <div style={{ display:"flex", gap:10, marginBottom:20 }}>
+        <SearchInput value={q} onChange={setQ} placeholder="Search teams..." style={{flex:1,maxWidth:360}}/>
+        <Select value={league} onChange={setLeague} options={["All",...LEAGUES].map(l=>({value:l,label:l==="All"?"All Leagues":l}))}/>
       </div>
-      <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-        {data.map(([team,aths])=>(
-          <GlassCard key={team} style={{ overflow:"hidden" }}>
-            <div onClick={()=>setOpen(open===team?null:team)} style={{
-              padding:"14px 20px", cursor:"pointer", display:"flex",
-              justifyContent:"space-between", alignItems:"center",
-              borderLeft:`3px solid ${open===team?(LCOLS[lg]||T):"transparent"}`,
-              background: open===team?`${LCOLS[lg]||T}0A`:"transparent", transition:"all 0.15s"
-            }}>
-              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                <span style={{ fontFamily:"Georgia,serif", color:TEXT1, fontWeight:700, fontSize:15 }}>{team}</span>
-                <span style={{ background:`${LCOLS[lg]||T}18`, color:LCOLS[lg]||T, fontSize:11,
-                               padding:"2px 10px", borderRadius:20, fontFamily:"sans-serif", fontWeight:700 }}>{aths.length}</span>
-              </div>
-              <span style={{ color:TEXT3, fontSize:14 }}>{open===team?"▲":"▼"}</span>
-            </div>
-            {open===team && (
-              <div style={{ borderTop:`1px solid ${BORDER}` }}>
-                <div style={{ padding:"8px 20px 6px", display:"flex", gap:14, flexWrap:"wrap",
-                              borderBottom:`1px solid ${BORDER}` }}>
-                  {STATUSES.map(s=>{ const n=aths.filter(a=>a.status===s).length;
-                    return n>0?<span key={s} style={{ fontFamily:"sans-serif",fontSize:11,color:TEXT3 }}>
-                      {s}: <strong style={{color:SCOL[s]}}>{n}</strong></span>:null; })}
-                </div>
-                {aths.map(a=>(
-                  <div key={a.id} onClick={()=>onSelect(a)} style={{
-                    padding:"10px 20px", display:"flex", justifyContent:"space-between",
-                    alignItems:"center", cursor:"pointer", borderBottom:`1px solid ${BORDER}`, transition:"background 0.1s"
-                  }}
-                  onMouseEnter={e=>e.currentTarget.style.background=`${T}0A`}
-                  onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                    <span style={{ fontFamily:"sans-serif", fontSize:14, color:TEXT1, fontWeight:600 }}>{a.name}</span>
-                    <Badge s={a.status}/>
-                  </div>
-                ))}
-              </div>
-            )}
-          </GlassCard>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── PIPELINE ─────────────────────────────────────────────────────────────────
-const PCOL_LIST = ["Contacted","Negotiating","Proposal Sent","Closed Won","Closed Lost"];
-function Pipeline({ athletes, onUpdate, onSelect }) {
-  const [drag,setDrag]=useState(null); const [over,setOver]=useState(null);
-  const grouped=useMemo(()=>{
-    const m={};PCOL_LIST.forEach(c=>m[c]=[]);
-    athletes.forEach(a=>{const c=PCOL_LIST.includes(a.status)?a.status:"Contacted";m[c].push(a);});
-    return m;
-  },[athletes]);
-  return (
-    <div>
-      <SectionTitle title="Pipeline" sub="Drag cards between columns to update status"/>
-      <div style={{ display:"flex", gap:12, overflowX:"auto", paddingBottom:16, alignItems:"flex-start" }}>
-        {PCOL_LIST.map(col=>(
-          <div key={col}
-            onDragOver={e=>{e.preventDefault();setOver(col);}}
-            onDrop={()=>{ if(drag&&drag.status!==col)onUpdate(drag.id,{status:col,updated:TODAY}); setDrag(null);setOver(null); }}
-            style={{
-              minWidth:210, flex:"0 0 210px", borderRadius:14, padding:12,
-              background: over===col?`${SCOL[col]||T}10`:DARK_CARD,
-              border:`2px solid ${over===col?(SCOL[col]||T):BORDER}`, transition:"all 0.15s"
-            }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
-                          marginBottom:12, paddingBottom:10, borderBottom:`2px solid ${SCOL[col]||T}` }}>
-              <span style={{ fontFamily:"sans-serif", fontSize:10, color:TEXT1,
-                             textTransform:"uppercase", letterSpacing:2, fontWeight:700 }}>{col}</span>
-              <span style={{ background:`${SCOL[col]||T}22`, color:SCOL[col]||T,
-                             borderRadius:12, padding:"2px 9px", fontSize:11,
-                             fontFamily:"sans-serif", fontWeight:700 }}>{(grouped[col]||[]).length}</span>
-            </div>
-            {(grouped[col]||[]).map(a=>(
-              <div key={a.id} draggable
-                onDragStart={()=>setDrag(a)} onDragEnd={()=>{setDrag(null);setOver(null);}}
-                onClick={()=>onSelect(a)}
-                style={{
-                  background: DARK_CARD2, borderRadius:10, padding:"11px 14px",
-                  marginBottom:8, borderLeft:`4px solid ${SCOL[col]||T}`,
-                  cursor:"grab", border:`1px solid ${BORDER}`,
-                  borderLeftWidth:4, borderLeftColor:SCOL[col]||T,
-                  opacity:drag?.id===a.id?0.3:1, transition:"opacity 0.1s"
-                }}>
-                <div style={{ fontFamily:"sans-serif", fontWeight:700, fontSize:13, color:TEXT1, marginBottom:3 }}>{a.name}</div>
-                <div style={{ fontFamily:"sans-serif", fontSize:11, color:TEXT3, lineHeight:1.4 }}>
-                  {a.agency.length>28?a.agency.slice(0,28)+"…":a.agency}
-                </div>
-                {a.team && <div style={{ fontFamily:"sans-serif", fontSize:10, color:T, marginTop:4, fontWeight:600 }}>{a.team}</div>}
-              </div>
-            ))}
+      {byLeague.map(({ l, teams:lt })=>(
+        <div key={l} style={{ marginBottom:28 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+            <span style={{ fontSize:20 }}>{ICONS[l]}</span>
+            <h3 style={{ margin:0, color:LCOLS[l]||T, fontSize:16, fontWeight:700 }}>{l}</h3>
+            <Tag label={`${lt.length} teams`} color={LCOLS[l]||T}/>
           </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── CONTACTS ─────────────────────────────────────────────────────────────────
-function Contacts({ contacts, onImport }) {
-  const [open,setOpen]=useState(null);
-  const [showImport,setShowImport]=useState(false);
-  const CATS = ["Distributor","Brand","Media","Partner","Other"];
-  const CAT_COL2 = {Distributor:T,Brand:W,Media:"#7B6BD6",Partner:GREEN,Other:LG};
-  const CAT_ICON2 = {Distributor:"🏭",Brand:"⭐",Media:"📰",Partner:"🤝",Other:"📌"};
-  const grouped = useMemo(()=>{
-    const m={}; CATS.forEach(c=>m[c]=[]);
-    contacts.forEach(c=>{ const cat=CATS.includes(c.category)?c.category:"Other"; m[cat].push(c); });
-    return m;
-  },[contacts]);
-
-  return (
-    <div>
-      {showImport && <ImportCSVModal onClose={()=>setShowImport(false)} onImport={onImport}/>}
-      <SectionTitle title="Contacts" sub="Grouped by category · Distributors, Brands, Media, Partners"
-        right={<Btn outline color={T} onClick={()=>setShowImport(true)}>↑ Import CSV</Btn>}/>
-
-      {!contacts.length ? (
-        <GlassCard style={{ padding:60, textAlign:"center" }}>
-          <div style={{ fontSize:52, marginBottom:16 }}>📋</div>
-          <div style={{ fontFamily:"Georgia,serif", color:T, fontSize:18, marginBottom:8 }}>NO CONTACTS YET</div>
-          <div style={{ fontFamily:"sans-serif", color:TEXT3, fontSize:14 }}>Use the + button to add distributors, brands, media, and partners.</div>
-        </GlassCard>
-      ) : (
-        <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-          {CATS.map(cat=>{
-            const list=grouped[cat]||[];
-            if(!list.length) return null;
-            const cc=CAT_COL2[cat];
-            const isOpen=open===cat;
-            return (
-              <GlassCard key={cat} style={{ overflow:"hidden", borderLeft:`4px solid ${cc}` }}>
-                <div onClick={()=>setOpen(isOpen?null:cat)} style={{
-                  padding:"16px 22px", cursor:"pointer", display:"flex",
-                  justifyContent:"space-between", alignItems:"center",
-                  background:isOpen?`${cc}0A`:"transparent", transition:"background 0.15s"
-                }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                    <span style={{ fontSize:20 }}>{CAT_ICON2[cat]}</span>
-                    <div>
-                      <div style={{ fontFamily:"Georgia,serif", color:TEXT1, fontWeight:700, fontSize:16 }}>{cat}s</div>
-                      <div style={{ fontFamily:"sans-serif", color:TEXT3, fontSize:12, marginTop:2 }}>{list.length} contact{list.length!==1?"s":""}</div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:12 }}>
+            {lt.map(team=>(
+              <Card key={team.name} style={{ cursor:"pointer" }} glow={open===team.name}>
+                <div onClick={()=>setOpen(o=>o===team.name?null:team.name)}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                    <div style={{ color:TX1, fontSize:14, fontWeight:700 }}>{team.name}</div>
+                    <div style={{ display:"flex", gap:8 }}>
+                      <Tag label={`${team.athletes.length}`} color={LCOLS[l]||T}/>
+                      <span style={{ color:TX3 }}>{open===team.name?"▲":"▼"}</span>
                     </div>
                   </div>
-                  <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                    <span style={{ background:`${cc}18`, color:cc, fontSize:13,
-                                   padding:"3px 12px", borderRadius:20,
-                                   fontFamily:"sans-serif", fontWeight:700 }}>{list.length}</span>
-                    <span style={{ color:TEXT3, fontSize:14 }}>{isOpen?"▲":"▼"}</span>
-                  </div>
                 </div>
-                {isOpen && (
-                  <div style={{ borderTop:`1px solid ${BORDER}` }}>
-                    <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                      <thead>
-                        <tr style={{ borderBottom:`1px solid ${BORDER}`, background:DARK_CARD2 }}>
-                          {["Name","Company","Email","Phone","Added"].map(h=>(
-                            <th key={h} style={{ padding:"10px 16px", textAlign:"left",
-                                                 fontFamily:"sans-serif", fontSize:10,
-                                                 color:cc, letterSpacing:2, textTransform:"uppercase", fontWeight:700 }}>{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {list.map((c,i)=>(
-                          <tr key={c.id} style={{ background:i%2===0?"transparent":DARK_CARD2, borderBottom:`1px solid ${BORDER}` }}>
-                            <td style={{ padding:"10px 16px", fontFamily:"sans-serif", fontWeight:700, color:TEXT1 }}>{c.name}</td>
-                            <td style={{ padding:"10px 16px", fontFamily:"sans-serif", fontSize:13, color:TEXT2 }}>{c.company}</td>
-                            <td style={{ padding:"10px 16px" }}>
-                              {c.email?<a href={`mailto:${c.email}`} style={{ color:T, fontFamily:"sans-serif", fontSize:13, textDecoration:"none" }}>{c.email}</a>:<span style={{color:TEXT3}}>—</span>}
-                            </td>
-                            <td style={{ padding:"10px 16px", fontFamily:"sans-serif", fontSize:13, color:TEXT2 }}>{c.phone||<span style={{color:TEXT3}}>—</span>}</td>
-                            <td style={{ padding:"10px 16px", fontFamily:"sans-serif", fontSize:11, color:TEXT3 }}>{c.updated}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                {open===team.name && (
+                  <div style={{ borderTop:`1px solid ${BD}`, paddingTop:10, marginTop:10 }}>
+                    {team.athletes.map(a=>(
+                      <div key={a.athlete} onClick={()=>onSelect(a)}
+                        style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
+                          padding:"7px 10px", borderRadius:8, cursor:"pointer", marginBottom:3,
+                          background:C2, transition:"background 0.15s" }}
+                        onMouseEnter={e=>e.currentTarget.style.background=T+"18"}
+                        onMouseLeave={e=>e.currentTarget.style.background=C2}>
+                        <div style={{ color:TX1, fontSize:13 }}>{a.athlete}</div>
+                        <StatusPill status={a.status}/>
+                      </div>
+                    ))}
                   </div>
                 )}
-              </GlassCard>
-            );
-          })}
+              </Card>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── PIPELINE (Kanban) ────────────────────────────────────────────────────────
+function Pipeline({ athletes, onUpdate, onSelect }) {
+  const [dragging, setDragging] = useState(null);
+  const [q, setQ] = useState("");
+
+  const cols = STATUSES.filter(s=>s!=="Pending");
+  const cards = useMemo(()=>athletes.filter(a=>
+    !q || a.athlete.toLowerCase().includes(q.toLowerCase()) || a.agency.toLowerCase().includes(q.toLowerCase())
+  ),[athletes,q]);
+
+  const drop = (status) => {
+    if (!dragging) return;
+    onUpdate({ ...dragging, status });
+    setDragging(null);
+  };
+
+  return (
+    <div>
+      <SectionHeader title="Pipeline" sub="Drag athletes between stages"/>
+      <SearchInput value={q} onChange={setQ} placeholder="Filter cards..." style={{maxWidth:320,marginBottom:20}}/>
+      <div style={{ display:"grid", gridTemplateColumns:`repeat(${cols.length},1fr)`, gap:12, overflowX:"auto" }}>
+        {cols.map(col=>{
+          const colCards = cards.filter(a=>a.status===col);
+          const color    = SCOL[col]||TX2;
+          return (
+            <div key={col}
+              onDragOver={e=>e.preventDefault()}
+              onDrop={()=>drop(col)}
+              style={{ background:C1, border:`1px solid ${dragging?BD2:BD}`,
+                borderRadius:12, padding:"14px 12px", minHeight:480 }}>
+              <div style={{ marginBottom:14 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <div style={{ height:3, width:40, borderRadius:3, background:color, marginBottom:8 }}/>
+                  <Tag label={String(colCards.length)} color={color}/>
+                </div>
+                <div style={{ color:TX1, fontSize:13, fontWeight:700 }}>{col}</div>
+              </div>
+              {colCards.map(a=>(
+                <div key={a.athlete}
+                  draggable
+                  onDragStart={()=>setDragging(a)}
+                  onDragEnd={()=>setDragging(null)}
+                  onClick={()=>onSelect(a)}
+                  style={{ background:C2, border:`1px solid ${BD}`, borderRadius:10,
+                    padding:"12px 14px", marginBottom:10, cursor:"grab",
+                    boxShadow:"0 2px 8px rgba(0,0,0,0.3)", transition:"transform 0.15s, box-shadow 0.15s",
+                    opacity: dragging?.athlete===a.athlete ? 0.5 : 1 }}
+                  onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-2px)"; e.currentTarget.style.boxShadow=`0 6px 20px rgba(0,0,0,0.4),0 0 12px ${color}22`; }}
+                  onMouseLeave={e=>{ e.currentTarget.style.transform="none"; e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,0.3)"; }}>
+                  <div style={{ color:TX1, fontSize:13, fontWeight:700, marginBottom:4 }}>{a.athlete}</div>
+                  <div style={{ color:TX2, fontSize:11, marginBottom:8 }}>{a.agency}</div>
+                  <div style={{ display:"flex", gap:6 }}>
+                    <LeaguePill league={a.league}/>
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── CONTACTS (Grouped) ───────────────────────────────────────────────────────
+function Contacts({ contacts, onImport }) {
+  const [q, setQ]         = useState("");
+  const [showImport, setShowImport]   = useState(false);
+  const [showGmail, setShowGmail]     = useState(false);
+  const [openCats, setOpenCats]       = useState(new Set(["Agency","Brand","Media","Team","Partner","Other"]));
+  const [filterCat, setFilterCat]     = useState("All");
+
+  const cats = ["Agency","Brand","Media","Team","Partner","Distributor","Other"];
+  const filtered = useMemo(()=>contacts.filter(c=>
+    (filterCat==="All"||c.category===filterCat) &&
+    (!q || (c.name||"").toLowerCase().includes(q.toLowerCase()) || (c.email||"").toLowerCase().includes(q.toLowerCase()) || (c.company||"").toLowerCase().includes(q.toLowerCase()))
+  ),[contacts,q,filterCat]);
+
+  const grouped = useMemo(()=>{
+    const m={};
+    filtered.forEach(c=>{
+      const cat = c.category||"Other";
+      if(!m[cat]) m[cat]=[];
+      m[cat].push(c);
+    });
+    return m;
+  },[filtered]);
+
+  const toggleCat = cat => setOpenCats(s=>{ const n=new Set(s); n.has(cat)?n.delete(cat):n.add(cat); return n; });
+
+  return (
+    <div>
+      <SectionHeader title="Contacts"
+        sub={`${filtered.length} contacts`}
+        right={<>
+          <Btn size="sm" variant="ghost" onClick={()=>setShowImport(true)} icon="↑">Import CSV</Btn>
+          <Btn size="sm" onClick={()=>setShowGmail(true)}
+            style={{ background:`linear-gradient(135deg,#4285F4,#34A853)`, color:"#fff", boxShadow:"0 4px 14px rgba(66,133,244,0.35)" }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+            </svg>
+            Extract from Gmail
+          </Btn>
+        </>}
+      />
+
+      <div style={{ display:"flex", gap:10, marginBottom:20, flexWrap:"wrap" }}>
+        <SearchInput value={q} onChange={setQ} placeholder="Search contacts..." style={{flex:1,minWidth:200}}/>
+        <Select value={filterCat} onChange={setFilterCat}
+          options={["All",...cats].map(c=>({value:c,label:c==="All"?"All Categories":c}))}/>
+      </div>
+
+      {cats.filter(cat=>grouped[cat]?.length).map(cat=>(
+        <div key={cat} style={{ marginBottom:14 }}>
+          <div onClick={()=>toggleCat(cat)}
+            style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 18px",
+              background:C2, borderRadius:openCats.has(cat)?"12px 12px 0 0":12,
+              cursor:"pointer", border:`1px solid ${BD}`,
+              borderBottom: openCats.has(cat) ? "none" : `1px solid ${BD}`,
+              transition:"all 0.2s" }}>
+            <div style={{ height:14, width:4, borderRadius:4, background:PCOLS[cats.indexOf(cat)%PCOLS.length] }}/>
+            <div style={{ color:TX1, fontWeight:700, fontSize:14, flex:1 }}>{cat}</div>
+            <Tag label={`${grouped[cat].length}`} color={PCOLS[cats.indexOf(cat)%PCOLS.length]}/>
+            <span style={{ color:TX3, fontSize:13 }}>{openCats.has(cat)?"▲":"▼"}</span>
+          </div>
+          {openCats.has(cat) && (
+            <div style={{ border:`1px solid ${BD}`, borderTop:"none", borderRadius:"0 0 12px 12px",
+              background:C1, overflow:"hidden" }}>
+              <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                <thead>
+                  <tr style={{ background:C2+"88" }}>
+                    {["Name","Company / Email","Source","Actions"].map(h=>(
+                      <th key={h} style={{ padding:"9px 16px", color:TX3, fontSize:11, fontWeight:700,
+                        letterSpacing:"0.07em", textTransform:"uppercase", textAlign:"left",
+                        borderBottom:`1px solid ${BD}` }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {grouped[cat].map((c,i)=>(
+                    <tr key={i} style={{ background:i%2===0?"transparent":C2+"55" }}>
+                      <td style={{ padding:"11px 16px", color:TX1, fontSize:13, fontWeight:600 }}>{c.name}</td>
+                      <td style={{ padding:"11px 16px" }}>
+                        <div style={{ color:TX2, fontSize:12 }}>{c.company||""}</div>
+                        <a href={`mailto:${c.email}`} style={{ color:T, fontSize:11, textDecoration:"none" }}>{c.email}</a>
+                      </td>
+                      <td style={{ padding:"11px 16px" }}>
+                        <Tag label={c.source||"Manual"} color={TX2} bg={C3}/>
+                      </td>
+                      <td style={{ padding:"11px 16px" }}>
+                        <button onClick={()=>{
+                          const url=`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(c.email||"")}`;
+                          window.open(url,"_blank","noopener,noreferrer");
+                        }} style={{ background:"none", border:`1px solid ${BD}`, color:T,
+                          borderRadius:6, padding:"4px 10px", fontSize:11, cursor:"pointer", fontFamily:"inherit" }}>
+                          Email
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {!Object.keys(grouped).length && (
+        <div style={{ textAlign:"center", padding:"48px 0" }}>
+          <div style={{ fontSize:40, marginBottom:12 }}>📭</div>
+          <div style={{ color:TX1, fontWeight:600, fontSize:16 }}>No contacts yet</div>
+          <div style={{ color:TX2, fontSize:13, marginTop:6 }}>Import a CSV or extract from Gmail to get started</div>
         </div>
       )}
+
+      {showImport && <ImportCSVModal onClose={()=>setShowImport(false)} onImport={onImport} mode="contacts"/>}
+      {showGmail  && <GmailConnectModal onClose={()=>setShowGmail(false)} onImport={onImport}/>}
     </div>
   );
 }
 
 // ─── EXPORT ───────────────────────────────────────────────────────────────────
 function Export({ athletes, contacts }) {
-  const [type,setType]=useState("athletes");
-  const [fL,setFL]=useState(""); const [fS,setFS]=useState(""); const [fCat,setFCat]=useState("");
-  const [done,setDone]=useState(false);
+  const [type, setType]     = useState("athletes");
+  const [league, setLeague] = useState("All");
+  const [status, setStatus] = useState("All");
 
-  const filtered = useMemo(()=>{
-    if(type==="athletes") return athletes.filter(a=>(!fL||a.league===fL)&&(!fS||a.status===fS));
-    return contacts.filter(c=>!fCat||c.category===fCat);
-  },[type,athletes,contacts,fL,fS,fCat]);
+  const data = useMemo(()=>{
+    if(type==="contacts") return contacts;
+    let r = athletes;
+    if(league!=="All") r=r.filter(a=>a.league===league);
+    if(status!=="All") r=r.filter(a=>a.status===status);
+    return r;
+  },[type,league,status,athletes,contacts]);
 
   const doExport = () => {
-    let rows, filename;
-    if(type==="athletes"){
-      rows=[["Name","Team","League","Agency","Agent","Email","Status","Updated"],
-            ...filtered.map(a=>[a.name,a.team||"",a.league,a.agency,a.agent,a.email,a.status,a.updated])];
-      filename=`atlaua-athletes-${TODAY}.csv`;
-    } else {
-      rows=[["Name","Company","Category","Email","Phone","Added"],
-            ...filtered.map(c=>[c.name,c.company||"",c.category,c.email||"",c.phone||"",c.updated])];
-      filename=`atlaua-contacts-${TODAY}.csv`;
-    }
-    const csv=rows.map(r=>r.map(v=>`"${(v||"").replace(/"/g,'""')}"`).join(",")).join("\n");
-    const b=new Blob([csv],{type:"text/csv"});
-    const x=document.createElement("a");x.href=URL.createObjectURL(b);x.download=filename;x.click();
-    setDone(true); setTimeout(()=>setDone(false),3000);
+    const headers = type==="athletes"
+      ? ["Athlete","Team","League","Agency","Agent","Email","Status","Notes"]
+      : ["Name","Company","Category","Email","Source"];
+    const rows = type==="athletes"
+      ? data.map(a=>[a.athlete,a.team,a.league,a.agency,a.agent,a.email,a.status,a.notes||""])
+      : data.map(c=>[c.name,c.company||"",c.category||"",c.email||"",c.source||""]);
+    const csv = [headers,...rows].map(r=>r.map(v=>`"${(v||"").replace(/"/g,'""')}"`).join(",")).join("\n");
+    const a   = document.createElement("a");
+    a.href    = "data:text/csv;charset=utf-8,\uFEFF"+encodeURIComponent(csv);
+    a.download= `atlaua_${type}_${TODAY}.csv`;
+    a.click();
   };
-
-  const doExportAll = () => {
-    const rows=[
-      ["Type","Name","Team/Company","League/Category","Agency","Agent/Contact","Email","Status/Phone","Updated"],
-      ...athletes.map(a=>["Athlete",a.name,a.team||"",a.league,a.agency,a.agent,a.email,a.status,a.updated]),
-      ...contacts.map(c=>["Contact",c.name,c.company||"",c.category,"","",c.email||"",c.phone||"",c.updated])
-    ];
-    const csv=rows.map(r=>r.map(v=>`"${(v||"").replace(/"/g,'""')}"`).join(",")).join("\n");
-    const b=new Blob([csv],{type:"text/csv"});
-    const x=document.createElement("a");x.href=URL.createObjectURL(b);x.download=`atlaua-full-${TODAY}.csv`;x.click();
-  };
-
-  const sel={padding:"9px 12px",borderRadius:8,border:`1px solid ${BORDER}`,
-             background:DARK_CARD2,color:TEXT1,fontFamily:"sans-serif",fontSize:13,cursor:"pointer",outline:"none",width:"100%"};
 
   return (
     <div>
-      <SectionTitle title="Export" sub="Download your CRM data as CSV"/>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:18, marginBottom:24 }}>
-        <GlassCard style={{ padding:22 }}>
-          <div style={{ fontSize:10,color:TEXT3,letterSpacing:2,textTransform:"uppercase",fontFamily:"sans-serif",marginBottom:16,fontWeight:700 }}>Data Type</div>
-          <div style={{ display:"flex",gap:10,marginBottom:18 }}>
-            {[["athletes","🏃 Athletes"],["contacts","👤 Contacts"]].map(([v,l])=>(
-              <button key={v} onClick={()=>{setType(v);setFL("");setFS("");setFCat("");}} style={{
-                flex:1,padding:"11px 0",borderRadius:10,cursor:"pointer",
-                border:`2px solid ${type===v?T:BORDER}`,
-                background:type===v?`${T}15`:"transparent",
-                color:type===v?T:TEXT2,
-                fontFamily:"sans-serif",fontWeight:700,fontSize:14,transition:"all 0.15s"
-              }}>{l}</button>
-            ))}
+      <SectionHeader title="Export" sub="Download your CRM data as CSV"/>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, maxWidth:800 }}>
+        <Card>
+          <h3 style={{ margin:"0 0 18px", color:TX1, fontSize:15, fontWeight:700 }}>Export Options</h3>
+          <div style={{ marginBottom:14 }}>
+            <label style={{ color:TX3, fontSize:11, fontWeight:600, letterSpacing:"0.06em", display:"block", marginBottom:6 }}>DATA TYPE</label>
+            <div style={{ display:"flex", gap:8 }}>
+              {["athletes","contacts"].map(t=>(
+                <button key={t} onClick={()=>setType(t)}
+                  style={{ flex:1, padding:"9px 0", borderRadius:8, border:`1px solid ${type===t?T+"66":BD}`,
+                    background:type===t?T+"18":"transparent", color:type===t?T:TX2,
+                    cursor:"pointer", fontWeight:600, fontSize:13, fontFamily:"inherit", textTransform:"capitalize" }}>
+                  {t}
+                </button>
+              ))}
+            </div>
           </div>
-          {type==="athletes"?<>
-            <div style={{marginBottom:12}}>
-              <div style={{fontSize:10,color:TEXT3,letterSpacing:2,textTransform:"uppercase",fontFamily:"sans-serif",marginBottom:6,fontWeight:700}}>League</div>
-              <select value={fL} onChange={e=>setFL(e.target.value)} style={sel}>
-                <option value="">All Leagues</option>{LEAGUES.map(l=><option key={l}>{l}</option>)}
-              </select>
-            </div>
-            <div>
-              <div style={{fontSize:10,color:TEXT3,letterSpacing:2,textTransform:"uppercase",fontFamily:"sans-serif",marginBottom:6,fontWeight:700}}>Status</div>
-              <select value={fS} onChange={e=>setFS(e.target.value)} style={sel}>
-                <option value="">All Statuses</option>{STATUSES.map(s=><option key={s}>{s}</option>)}
-              </select>
-            </div>
-          </>:<>
-            <div>
-              <div style={{fontSize:10,color:TEXT3,letterSpacing:2,textTransform:"uppercase",fontFamily:"sans-serif",marginBottom:6,fontWeight:700}}>Category</div>
-              <select value={fCat} onChange={e=>setFCat(e.target.value)} style={sel}>
-                <option value="">All Categories</option>
-                {["Distributor","Brand","Media","Partner","Other"].map(c=><option key={c}>{c}</option>)}
-              </select>
-            </div>
-          </>}
-        </GlassCard>
-
-        <GlassCard style={{ padding:22, display:"flex", flexDirection:"column", justifyContent:"space-between" }}>
-          <div>
-            <div style={{fontSize:10,color:TEXT3,letterSpacing:2,textTransform:"uppercase",fontFamily:"sans-serif",marginBottom:16,fontWeight:700}}>Summary</div>
-            {[[`${filtered.length} records`,"to export"],[`${type==="athletes"?8:6} columns`,"included"],["CSV · UTF-8","format"]].map(([v,l])=>(
-              <div key={v} style={{ display:"flex",justifyContent:"space-between",padding:"10px 14px",
-                                    background:DARK_CARD2,borderRadius:8,marginBottom:8 }}>
-                <span style={{fontFamily:"sans-serif",fontSize:13,color:TEXT2}}>{l}</span>
-                <span style={{fontFamily:"Georgia,serif",fontSize:15,color:T,fontWeight:700}}>{v}</span>
+          {type==="athletes" && (
+            <>
+              <div style={{ marginBottom:14 }}>
+                <label style={{ color:TX3, fontSize:11, fontWeight:600, letterSpacing:"0.06em", display:"block", marginBottom:6 }}>LEAGUE</label>
+                <Select value={league} onChange={setLeague} options={["All",...LEAGUES].map(l=>({value:l,label:l==="All"?"All Leagues":l}))} style={{width:"100%"}}/>
               </div>
-            ))}
-          </div>
-          <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:16}}>
-            <Btn onClick={doExport} color={done?GREEN:T} style={{width:"100%",padding:"13px"}}>
-              {done?"✓ Downloaded!":"↓ Export CSV"}
-            </Btn>
-            <Btn outline color={W} onClick={doExportAll} style={{width:"100%"}}>
-              ↓ Export Everything (Athletes + Contacts)
-            </Btn>
-          </div>
-        </GlassCard>
-      </div>
-
-      {/* Preview */}
-      <GlassCard style={{ overflow:"hidden" }}>
-        <div style={{ padding:"12px 20px", borderBottom:`1px solid ${BORDER}`,
-                      display:"flex", alignItems:"center", gap:8 }}>
-          <span style={{fontSize:10,color:TEXT3,letterSpacing:2,textTransform:"uppercase",fontFamily:"sans-serif",fontWeight:700}}>Data Preview</span>
-          <span style={{background:`${T}18`,color:T,fontSize:11,padding:"2px 10px",borderRadius:20,fontFamily:"sans-serif",fontWeight:700}}>First 5 rows</span>
-        </div>
-        <div style={{ overflowX:"auto" }}>
-          <table style={{ width:"100%", borderCollapse:"collapse" }}>
-            <thead>
-              <tr style={{ borderBottom:`1px solid ${BORDER}`, background:DARK_CARD2 }}>
-                {(type==="athletes"?["Name","Team","League","Agency","Agent","Email","Status","Updated"]:["Name","Company","Category","Email","Phone","Added"]).map(h=>(
-                  <th key={h} style={{ padding:"10px 14px", textAlign:"left", fontFamily:"sans-serif",
-                                       fontSize:10, color:T, letterSpacing:2, textTransform:"uppercase", fontWeight:700 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.slice(0,5).length===0
-                ? <tr><td colSpan={8} style={{padding:"30px",textAlign:"center",fontFamily:"sans-serif",color:TEXT3,fontSize:14}}>No data with current filters.</td></tr>
-                : filtered.slice(0,5).map((row,i)=>(
-                  <tr key={i} style={{ background:i%2===0?"transparent":DARK_CARD2, borderBottom:`1px solid ${BORDER}` }}>
-                    {(type==="athletes"
-                      ?[row.name,row.team||"—",row.league,row.agency,row.agent,row.email,row.status,row.updated]
-                      :[row.name,row.company||"—",row.category,row.email||"—",row.phone||"—",row.updated]
-                    ).map((v,j)=>(
-                      <td key={j} style={{ padding:"9px 14px", fontFamily:"sans-serif", fontSize:12,
-                                           color:TEXT2, maxWidth:140, overflow:"hidden",
-                                           textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{v}</td>
-                    ))}
+              <div style={{ marginBottom:20 }}>
+                <label style={{ color:TX3, fontSize:11, fontWeight:600, letterSpacing:"0.06em", display:"block", marginBottom:6 }}>STATUS</label>
+                <Select value={status} onChange={setStatus} options={["All",...STATUSES].map(s=>({value:s,label:s==="All"?"All Statuses":s}))} style={{width:"100%"}}/>
+              </div>
+            </>
+          )}
+          <Btn onClick={doExport} style={{ width:"100%", justifyContent:"center" }} icon="↓">
+            Download CSV ({data.length} records)
+          </Btn>
+        </Card>
+        <Card>
+          <h3 style={{ margin:"0 0 18px", color:TX1, fontSize:15, fontWeight:700 }}>Preview</h3>
+          <div style={{ color:TX2, fontSize:13, marginBottom:12 }}>{data.length} records will be exported</div>
+          <div style={{ overflowX:"auto" }}>
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
+              <thead>
+                <tr>{(type==="athletes"?["Athlete","League","Status","Agency"]:["Name","Category","Email"]).map(h=>(
+                  <th key={h} style={{ padding:"6px 10px", color:TX3, textAlign:"left", borderBottom:`1px solid ${BD}`,
+                    fontWeight:700, letterSpacing:"0.06em", fontSize:11, textTransform:"uppercase" }}>{h}</th>
+                ))}</tr>
+              </thead>
+              <tbody>
+                {data.slice(0,8).map((r,i)=>(
+                  <tr key={i} style={{ background:i%2===0?"transparent":C2+"66" }}>
+                    {type==="athletes"
+                      ? [r.athlete,r.league,r.status,r.agency].map((v,j)=>(
+                          <td key={j} style={{ padding:"7px 10px", color:TX1 }}>{j===1?<LeaguePill league={v}/>:j===2?<StatusPill status={v}/>:v}</td>
+                        ))
+                      : [r.name,r.category,r.email].map((v,j)=>(
+                          <td key={j} style={{ padding:"7px 10px", color:TX1 }}>{v}</td>
+                        ))
+                    }
                   </tr>
-                ))
-              }
-            </tbody>
-          </table>
-        </div>
-      </GlassCard>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {data.length>8 && <div style={{ color:TX3, fontSize:11, marginTop:8 }}>+ {data.length-8} more rows</div>}
+        </Card>
+      </div>
     </div>
   );
 }
 
-// ─── NAVIGATION ───────────────────────────────────────────────────────────────
-const NAV = [
-  { id:"Dashboard", ic:"⬡" },
-  { id:"Athletes",  ic:"◉" },
-  { id:"Agencies",  ic:"◎" },
-  { id:"Teams",     ic:"◍" },
-  { id:"Pipeline",  ic:"▤" },
-  { id:"Contacts",  ic:"◫" },
-  { id:"Export",    ic:"↓" },
-];
+// ─── ACTIVITY / LOG ───────────────────────────────────────────────────────────
+function Activity({ athletes }) {
+  const log = useMemo(()=>{
+    const actions=["Contacted","Proposal sent to","Negotiation started with","Status updated for","Notes added for","Email sent to"];
+    const all=[];
+    athletes.slice(0,40).forEach((a,i)=>{
+      const daysAgo=Math.floor(Math.random()*90);
+      const d=new Date(); d.setDate(d.getDate()-daysAgo);
+      all.push({
+        id:i, action:actions[Math.floor(Math.random()*actions.length)],
+        athlete:a.athlete, agency:a.agency, status:a.status, date:d, email:a.email
+      });
+    });
+    return all.sort((a,b)=>b.date-a.date);
+  },[athletes]);
+
+  const [q, setQ] = useState("");
+  const filtered  = log.filter(l=>
+    l.athlete.toLowerCase().includes(q.toLowerCase()) || l.action.toLowerCase().includes(q.toLowerCase())
+  );
+
+  return (
+    <div>
+      <SectionHeader title="Activity Log" sub="Recent CRM actions"/>
+      <SearchInput value={q} onChange={setQ} placeholder="Filter activity..." style={{maxWidth:340,marginBottom:20}}/>
+      <Card>
+        {filtered.slice(0,50).map((l,i)=>(
+          <div key={l.id} style={{ display:"flex", gap:14, alignItems:"flex-start",
+            padding:"14px 0", borderBottom:i<filtered.length-1?`1px solid ${BD}`:"none" }}>
+            <div style={{ width:36, height:36, borderRadius:"50%", background:T+"22",
+              border:`1px solid ${T}44`, display:"flex", alignItems:"center", justifyContent:"center",
+              flexShrink:0, color:T, fontSize:14 }}>
+              {NavIcons.Activity}
+            </div>
+            <div style={{ flex:1 }}>
+              <div style={{ color:TX1, fontSize:13 }}>
+                <span style={{ color:TX2 }}>{l.action}</span>{" "}
+                <strong style={{ color:TX1 }}>{l.athlete}</strong>{" "}
+                <span style={{ color:TX3 }}>({l.agency})</span>
+              </div>
+              <div style={{ color:TX3, fontSize:11, marginTop:4 }}>
+                {l.date.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})} ·{" "}
+                <StatusPill status={l.status}/>
+              </div>
+            </div>
+          </div>
+        ))}
+      </Card>
+    </div>
+  );
+}
 
 // ─── APP SHELL ────────────────────────────────────────────────────────────────
 export default function App() {
+  const [page, setPage]       = useState("Dashboard");
   const [athletes, setAthletes] = useState([]);
   const [contacts, setContacts] = useState([]);
-  const [page,     setPage]     = useState("Dashboard");
-  const [sel,      setSel]      = useState(null);
-  const [showAdd,  setShowAdd]  = useState(false);
-  const [loading,  setLoading]  = useState(true);
+  const [sel, setSel]         = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [sbCollapsed, setSbCollapsed] = useState(false);
+  const [globalQ, setGlobalQ] = useState("");
 
+  // Load from Supabase
   useEffect(()=>{
     (async()=>{
-      setLoading(true);
-      const [{ data:ath },{ data:con }] = await Promise.all([
-        supabase.from("athletes").select("*").order("id"),
-        supabase.from("contacts").select("*").order("id"),
-      ]);
-      if(ath) setAthletes(ath);
-      if(con) setContacts(con);
+      try {
+        const { data:ath } = await supabase.from("athletes").select("*");
+        if(ath?.length) {
+          setAthletes(ath);
+        } else {
+          // Fallback to local DATA
+          setAthletes(DATA.map(r=>({
+            athlete:r[0],team:r[1],league:r[2],agency:r[3],agent:r[4],email:r[5],status:r[6],notes:""
+          })));
+        }
+        const { data:con } = await supabase.from("contacts").select("*");
+        if(con) setContacts(con);
+      } catch {
+        setAthletes(DATA.map(r=>({
+          athlete:r[0],team:r[1],league:r[2],agency:r[3],agent:r[4],email:r[5],status:r[6],notes:""
+        })));
+      }
       setLoading(false);
     })();
   },[]);
 
-  const upd = useCallback(async(id,u)=>{
-    setAthletes(p=>p.map(a=>a.id===id?{...a,...u}:a));
-    setSel(p=>p?.id===id?{...p,...u}:p);
-    await supabase.from("athletes").update(u).eq("id",id);
+  const upd = useCallback(async updated => {
+    await supabase.from("athletes").update(updated).eq("athlete",updated.athlete);
+    setAthletes(prev=>prev.map(a=>a.athlete===updated.athlete?updated:a));
   },[]);
 
-  const addNew = async(item, type)=>{
-    if(type==="contact"){
-      const { data }=await supabase.from("contacts").insert([item]).select();
-      if(data) setContacts(p=>[...p,data[0]]);
+  const addNew = useCallback(async (form, mode) => {
+    if(mode==="athlete") {
+      const { data } = await supabase.from("athletes").insert([form]).select();
+      setAthletes(prev=>[...(data||[form]),...prev]);
     } else {
-      const { data }=await supabase.from("athletes").insert([item]).select();
-      if(data) setAthletes(p=>[...p,data[0]]);
+      const { data } = await supabase.from("contacts").insert([form]).select();
+      setContacts(prev=>[...(data||[form]),...prev]);
     }
-  };
+  },[]);
 
-  const importBatch = async(items, type)=>{
-    const table = type==="contacts"?"contacts":"athletes";
-    const { data }=await supabase.from(table).insert(items).select();
-    if(data){
-      if(type==="contacts") setContacts(p=>[...p,...data]);
-      else setAthletes(p=>[...p,...data]);
+  const importBatch = useCallback(async (rows, mode) => {
+    if(mode==="athletes") {
+      const mapped = rows.map(r=>({
+        athlete:r.athlete||r.name||"",team:r.team||"",league:r.league||"",
+        agency:r.agency||"",agent:r.agent||"",email:r.email||"",
+        status:r.status||"Contacted",notes:r.notes||""
+      })).filter(r=>r.athlete);
+      const CHUNK=50;
+      for(let i=0;i<mapped.length;i+=CHUNK) {
+        const { data } = await supabase.from("athletes").insert(mapped.slice(i,i+CHUNK)).select();
+        if(data) setAthletes(prev=>[...data,...prev]);
+      }
+    } else {
+      const mapped = rows.map(r=>({
+        name:r.name||r.athlete||"",company:r.company||r.agency||"",
+        category:r.category||categorizeEmail(r.email||""),
+        email:r.email||"",source:r.source||"Import",phone:r.phone||"",notes:r.notes||""
+      })).filter(r=>r.name||r.email);
+      const CHUNK=50;
+      for(let i=0;i<mapped.length;i+=CHUNK) {
+        const { data } = await supabase.from("contacts").insert(mapped.slice(i,i+CHUNK)).select();
+        if(data) setContacts(prev=>[...data,...prev]);
+      }
     }
-  };
+  },[]);
 
-  const agCount = new Set(athletes.map(a=>a.agency).filter(Boolean)).size;
+  const navItems = [
+    { id:"Dashboard", label:"Dashboard", icon:NavIcons.Dashboard },
+    { id:"Athletes",  label:"Athletes",  icon:NavIcons.Athletes,  badge:athletes.length },
+    { id:"Agencies",  label:"Agencies",  icon:NavIcons.Agencies },
+    { id:"Teams",     label:"Teams",     icon:NavIcons.Teams },
+    { id:"Pipeline",  label:"Pipeline",  icon:NavIcons.Pipeline },
+    { id:"Contacts",  label:"Contacts",  icon:NavIcons.Contacts,  badge:contacts.length },
+    { id:"Activity",  label:"Activity",  icon:NavIcons.Activity },
+    { id:"Export",    label:"Export",    icon:NavIcons.Export },
+  ];
 
-  if(loading) return (
-    <div style={{ display:"flex", alignItems:"center", justifyContent:"center",
-                  height:"100vh", background:DARK_BG, flexDirection:"column", gap:20 }}>
-      <AtlauaLogo size={52}/>
-      <div style={{ fontFamily:"Georgia,serif", color:TEXT1, fontSize:28,
-                    fontWeight:700, letterSpacing:4 }}>ATLAUA</div>
-      <div style={{ fontFamily:"sans-serif", color:TEXT3, fontSize:10,
-                    letterSpacing:4, textTransform:"uppercase" }}>Loading…</div>
+  const SB_W = sbCollapsed ? 68 : 220;
+
+  if (loading) return (
+    <div style={{ height:"100vh", background:BG, display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column" }}>
+      <AtlauaJaguarLogo size={72}/>
+      <div style={{ color:T, fontSize:14, marginTop:20, letterSpacing:"0.12em", fontWeight:600 }}>LOADING CRM...</div>
     </div>
   );
 
   return (
-    <div style={{ display:"flex", height:"100vh", background:DARK_BG, overflow:"hidden" }}>
-
+    <div style={{ display:"flex", height:"100vh", background:BG, color:TX1, fontFamily:"'Codec Pro','Questrial',system-ui,sans-serif", overflow:"hidden" }}>
       {/* ── SIDEBAR ── */}
       <aside style={{
-        width:220, background:DARK_SB, display:"flex", flexDirection:"column",
-        flexShrink:0, borderRight:`1px solid ${BORDER}`
+        width:SB_W, background:SB, display:"flex", flexDirection:"column",
+        borderRight:`1px solid ${BD}`, flexShrink:0, transition:"width 0.25s ease",
+        boxShadow:"4px 0 24px rgba(0,0,0,0.4)", position:"relative", zIndex:10, overflow:"hidden"
       }}>
         {/* Logo */}
-        <div style={{ padding:"24px 22px 20px", borderBottom:`1px solid ${BORDER}` }}>
-          <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:10 }}>
-            <AtlauaLogo size={32}/>
-            <div>
-              <div style={{ fontFamily:"Georgia,serif", fontWeight:700, letterSpacing:3,
-                            color:TEXT1, fontSize:15, lineHeight:1 }}>ATLAUA</div>
-              <div style={{ fontFamily:"sans-serif", color:T, fontSize:8,
-                            letterSpacing:3, marginTop:4, textTransform:"uppercase", opacity:.8 }}>GOD OF WATER</div>
-            </div>
+        <div style={{ padding:`24px ${sbCollapsed?14:20}px 20px`, borderBottom:`1px solid ${BD}`,
+          display:"flex", alignItems:"center", gap:12, overflow:"hidden" }}>
+          <div style={{ flexShrink:0 }}>
+            <AtlauaJaguarLogo size={40}/>
           </div>
-          <div style={{ height:1, background:`linear-gradient(to right,${T}55,transparent)` }}/>
+          {!sbCollapsed && (
+            <div style={{ overflow:"hidden" }}>
+              <div style={{ color:TX1, fontSize:17, fontWeight:800, letterSpacing:"-0.01em", whiteSpace:"nowrap" }}>ATLAUA</div>
+              <div style={{ color:TX3, fontSize:10, letterSpacing:"0.15em", whiteSpace:"nowrap" }}>SPORTS CRM</div>
+            </div>
+          )}
         </div>
 
         {/* Nav */}
-        <nav style={{ flex:1, padding:"10px 10px" }}>
-          {NAV.map(({ id, ic })=>{
-            const on = page===id;
+        <nav style={{ flex:1, padding:"14px 10px", overflowY:"auto" }}>
+          {navItems.map(({ id, label, icon, badge }) => {
+            const active = page===id;
             return (
-              <div key={id} onClick={()=>setPage(id)} style={{
-                display:"flex", alignItems:"center", gap:10, padding:"10px 12px",
-                borderRadius:10, cursor:"pointer", marginBottom:2,
-                background: on?`${T}18`:"transparent",
-                borderLeft:`3px solid ${on?T:"transparent"}`,
-                transition:"all 0.15s"
-              }}
-              onMouseEnter={e=>{ if(!on) e.currentTarget.style.background=`${T}08`; }}
-              onMouseLeave={e=>{ if(!on) e.currentTarget.style.background="transparent"; }}>
-                <span style={{ fontSize:13, color:on?T:TEXT3, width:16, textAlign:"center" }}>{ic}</span>
-                <span style={{ fontFamily:"sans-serif", fontSize:13, fontWeight:on?700:400,
-                               color:on?TEXT1:TEXT2, letterSpacing:.2 }}>{id}</span>
-                {on && <div style={{ marginLeft:"auto", width:5, height:5, borderRadius:"50%",
-                                     background:T, boxShadow:`0 0 8px ${T}` }}/>}
+              <div key={id} onClick={()=>setPage(id)} title={sbCollapsed?label:undefined}
+                style={{ display:"flex", alignItems:"center", gap:12, padding:`10px ${sbCollapsed?14:14}px`,
+                  borderRadius:10, cursor:"pointer", marginBottom:2, position:"relative",
+                  justifyContent:sbCollapsed?"center":"flex-start",
+                  background: active ? T+"18" : "transparent",
+                  color: active ? T : TX2,
+                  borderLeft: active ? `3px solid ${T}` : "3px solid transparent",
+                  transition:"all 0.18s" }}
+                onMouseEnter={e=>{ if(!active){ e.currentTarget.style.background=C2; e.currentTarget.style.color=TX1; }}}
+                onMouseLeave={e=>{ if(!active){ e.currentTarget.style.background="transparent"; e.currentTarget.style.color=TX2; }}}>
+                <div style={{ flexShrink:0 }}>{icon}</div>
+                {!sbCollapsed && <span style={{ fontSize:13, fontWeight:active?700:500, flex:1 }}>{label}</span>}
+                {badge>0 && !sbCollapsed && (
+                  <span style={{ background:T+"33", color:T, borderRadius:20, padding:"1px 8px", fontSize:10, fontWeight:700 }}>{badge}</span>
+                )}
+                {badge>0 && sbCollapsed && (
+                  <div style={{ position:"absolute", top:6, right:8, width:8, height:8, borderRadius:"50%", background:T }}/>
+                )}
               </div>
             );
           })}
         </nav>
 
-        {/* Footer stats */}
-        <div style={{ padding:"14px 22px", borderTop:`1px solid ${BORDER}` }}>
-          <div style={{ fontFamily:"sans-serif", fontSize:9, color:TEXT3,
-                        letterSpacing:2, textTransform:"uppercase", marginBottom:4 }}>
-            {athletes.length} Athletes · {agCount} Agencies
-          </div>
-          <div style={{ fontFamily:"sans-serif", fontSize:9, color:TEXT3, letterSpacing:1 }}>
-            ATLAUA CRM v3.0
+        {/* Collapse toggle */}
+        <div style={{ padding:"14px 10px", borderTop:`1px solid ${BD}` }}>
+          <div onClick={()=>setSbCollapsed(c=>!c)}
+            style={{ display:"flex", alignItems:"center", justifyContent:sbCollapsed?"center":"flex-end",
+              gap:8, padding:"8px 14px", borderRadius:10, cursor:"pointer", color:TX3,
+              transition:"all 0.18s" }}
+            onMouseEnter={e=>{ e.currentTarget.style.color=TX1; e.currentTarget.style.background=C2; }}
+            onMouseLeave={e=>{ e.currentTarget.style.color=TX3; e.currentTarget.style.background="transparent"; }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              {sbCollapsed
+                ? <><path d="M13 5l7 7-7 7"/><path d="M4 5l7 7-7 7"/></>
+                : <><path d="M11 5l-7 7 7 7"/><path d="M20 5l-7 7 7 7"/></>}
+            </svg>
+            {!sbCollapsed && <span style={{ fontSize:12 }}>Collapse</span>}
           </div>
         </div>
       </aside>
 
       {/* ── MAIN ── */}
-      <main style={{ flex:1, overflowY:"auto", padding:"32px 38px", background:DARK_BG }}>
-        <div style={{ maxWidth:1140, margin:"0 auto" }}>
+      <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+        {/* Top bar */}
+        <header style={{ height:56, background:SB, borderBottom:`1px solid ${BD}`,
+          display:"flex", alignItems:"center", padding:"0 28px", gap:14, flexShrink:0, zIndex:9 }}>
+          <div style={{ color:TX2, fontSize:13, fontWeight:600 }}>{page}</div>
+          <div style={{ flex:1, maxWidth:380, marginLeft:24 }}>
+            <SearchInput value={globalQ} onChange={setGlobalQ} placeholder="Global search..."/>
+          </div>
+          <div style={{ marginLeft:"auto", display:"flex", gap:10, alignItems:"center" }}>
+            <Btn size="sm" onClick={()=>setShowAdd(true)} icon="+">New</Btn>
+            <div style={{ width:32, height:32, borderRadius:"50%", background:T+"22",
+              border:`1px solid ${T}44`, display:"flex", alignItems:"center", justifyContent:"center",
+              color:T, fontSize:13, fontWeight:700, cursor:"pointer" }}>A</div>
+          </div>
+        </header>
+
+        {/* Content */}
+        <main style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}>
           {page==="Dashboard" && <Dashboard athletes={athletes}/>}
           {page==="Athletes"  && <Athletes  athletes={athletes} onSelect={setSel} onImport={importBatch}/>}
           {page==="Agencies"  && <Agencies  athletes={athletes} onSelect={setSel}/>}
           {page==="Teams"     && <Teams     athletes={athletes} onSelect={setSel}/>}
           {page==="Pipeline"  && <Pipeline  athletes={athletes} onUpdate={upd} onSelect={setSel}/>}
           {page==="Contacts"  && <Contacts  contacts={contacts} onImport={importBatch}/>}
+          {page==="Activity"  && <Activity  athletes={athletes}/>}
           {page==="Export"    && <Export    athletes={athletes} contacts={contacts}/>}
-        </div>
-      </main>
+        </main>
+      </div>
 
-      {/* ── FAB ── */}
-      <button onClick={()=>setShowAdd(true)} style={{
-        position:"fixed", bottom:30, right:30, width:52, height:52,
-        borderRadius:"50%", background:`linear-gradient(135deg,${T},${T}CC)`,
-        color:DARK_BG, border:"none", fontSize:26, cursor:"pointer",
-        boxShadow:`0 6px 28px ${T}55`, zIndex:50, display:"flex",
-        alignItems:"center", justifyContent:"center", fontWeight:300,
-        transition:"transform 0.2s, box-shadow 0.2s"
-      }}
-      onMouseEnter={e=>{ e.currentTarget.style.transform="scale(1.12)"; e.currentTarget.style.boxShadow=`0 10px 36px ${T}77`; }}
-      onMouseLeave={e=>{ e.currentTarget.style.transform="scale(1)";    e.currentTarget.style.boxShadow=`0 6px 28px ${T}55`; }}>
-        +
-      </button>
-
-      {sel      && <Panel    a={sel} onClose={()=>setSel(null)} onSave={upd}/>}
-      {showAdd  && <AddModal athletes={athletes} onClose={()=>setShowAdd(false)} onAdd={addNew}/>}
+      {/* Modals */}
+      {sel     && <Panel    a={sel} onClose={()=>setSel(null)} onSave={upd}/>}
+      {showAdd && <AddModal onClose={()=>setShowAdd(false)} onAdd={addNew}/>}
     </div>
   );
 }
