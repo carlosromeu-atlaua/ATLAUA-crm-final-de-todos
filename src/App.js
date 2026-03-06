@@ -1467,7 +1467,7 @@ function Panel({ a, onClose, onSave }) {
 // ─── ADD MODAL ────────────────────────────────────────────────────────────────
 function AddModal({ onClose, onAdd }) {
   const [mode, setMode] = useState("athlete");
-  const def = { athlete:"", team:"", league:"NFL", agency:"", agent:"", email:"", status:"Contacted", notes:"" };
+  const def = { athlete:"", team:"", league:"NFL", agency:"", agent:"", email:"", status:"Contacted", notes:"", phone:"", category:"Other" };
   const [form, setForm] = useState(def);
 
   const upd = (k,v) => setForm(p=>({...p,[k]:v}));
@@ -1476,11 +1476,11 @@ function AddModal({ onClose, onAdd }) {
   const inp = (label, key, type="text") => (
     <div style={{ marginBottom:12 }}>
       <label style={{ color:TX3, fontSize:11, fontWeight:600, letterSpacing:"0.06em", display:"block", marginBottom:5 }}>{label}</label>
-      {key==="league"||key==="status" ? (
+      {key==="league"||key==="status"||key==="category" ? (
         <select value={form[key]} onChange={e=>upd(key,e.target.value)}
           style={{ background:C2, border:`1px solid ${BD}`, borderRadius:8, padding:"9px 12px",
             color:TX1, fontSize:13, width:"100%", outline:"none", fontFamily:"inherit" }}>
-          {(key==="league"?LEAGUES:STATUSES).map(o=><option key={o}>{o}</option>)}
+          {(key==="league"?LEAGUES:key==="category"?["Agency","Brand","Media","Team","Partner","Distributor","Other"]:STATUSES).map(o=><option key={o}>{o}</option>)}
         </select>
       ) : (
         <input value={form[key]||""} type={type} onChange={e=>upd(key,e.target.value)}
@@ -1523,7 +1523,7 @@ function AddModal({ onClose, onAdd }) {
         )}
         {mode==="contact" && (
           <>
-            {inp("Full Name","athlete")}{inp("Company","agency")}{inp("Email","email","email")}{inp("Status","status")}
+            {inp("Full Name","athlete")}{inp("Company","agency")}{inp("Email","email","email")}{inp("Phone","phone")}{inp("Category","category")}
           </>
         )}
         <div style={{ display:"flex", gap:10, marginTop:16 }}>
@@ -2274,22 +2274,28 @@ export default function App() {
   const [mobileNav, setMobileNav] = useState(false);
   const isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
 
+  // Normalize Supabase row → local format (DB uses "name", app uses "athlete")
+  const fromDB = (row) => ({ ...row, athlete: row.name || "" });
+  // Normalize local → Supabase format
+  const toDB = (row) => {
+    const { athlete, ...rest } = row;
+    return { ...rest, name: athlete || row.name || "" };
+  };
+
   // Load from Supabase
   useEffect(()=>{
     (async()=>{
       try {
         const { data:ath } = await supabase.from("athletes").select("*");
         if(ath?.length) {
-          // Normalize: ensure "athlete" field exists (Supabase may use "name")
-          setAthletes(ath.map(a=>({ ...a, athlete: a.athlete || a.name || "" })));
+          setAthletes(ath.map(fromDB));
         } else {
-          // Fallback to local DATA
           setAthletes(DATA.map(r=>({
             athlete:r[0],team:r[1],league:r[2],agency:r[3],agent:r[4],email:r[5],status:r[6],notes:""
           })));
         }
         const { data:con } = await supabase.from("contacts").select("*");
-        if(con) setContacts(con);
+        if(con) setContacts(con.map(c=>({ ...c, athlete: c.name || "" })));
       } catch {
         setAthletes(DATA.map(r=>({
           athlete:r[0],team:r[1],league:r[2],agency:r[3],agent:r[4],email:r[5],status:r[6],notes:""
@@ -2300,46 +2306,58 @@ export default function App() {
   },[]);
 
   const upd = useCallback(async updated => {
+    const dbRow = toDB(updated);
     if (updated.id) {
-      await supabase.from("athletes").update(updated).eq("id", updated.id);
+      await supabase.from("athletes").update(dbRow).eq("id", updated.id);
     } else {
-      await supabase.from("athletes").update(updated).eq("athlete", updated.athlete);
+      await supabase.from("athletes").update(dbRow).eq("name", dbRow.name);
     }
     setAthletes(prev=>prev.map(a=>(a.id && a.id===updated.id) || a.athlete===updated.athlete ? updated : a));
   },[]);
 
   const addNew = useCallback(async (form, mode) => {
     if(mode==="athlete") {
-      const { data } = await supabase.from("athletes").insert([form]).select();
-      setAthletes(prev=>[...(data||[form]),...prev]);
+      const dbRow = toDB(form);
+      const { data } = await supabase.from("athletes").insert([dbRow]).select();
+      if(data?.length) setAthletes(prev=>[fromDB(data[0]),...prev]);
+      else setAthletes(prev=>[form,...prev]);
     } else {
-      const { data } = await supabase.from("contacts").insert([form]).select();
-      setContacts(prev=>[...(data||[form]),...prev]);
+      // Contact: map form fields to Supabase columns
+      const dbRow = {
+        name: form.athlete || form.name || "",
+        company: form.agency || form.company || "",
+        category: form.category || categorizeEmail(form.email || ""),
+        email: form.email || "",
+        phone: form.phone || ""
+      };
+      const { data } = await supabase.from("contacts").insert([dbRow]).select();
+      if(data?.length) setContacts(prev=>[{ ...data[0], athlete: data[0].name },...prev]);
+      else setContacts(prev=>[{ ...dbRow, athlete: dbRow.name },...prev]);
     }
   },[]);
 
   const importBatch = useCallback(async (rows, mode) => {
     if(mode==="athletes") {
       const mapped = rows.map(r=>({
-        athlete:r.athlete||r.name||"",team:r.team||"",league:r.league||"",
+        name:r.athlete||r.name||"",team:r.team||"",league:r.league||"",
         agency:r.agency||"",agent:r.agent||"",email:r.email||"",
         status:r.status||"Contacted",notes:r.notes||""
-      })).filter(r=>r.athlete);
+      })).filter(r=>r.name);
       const CHUNK=50;
       for(let i=0;i<mapped.length;i+=CHUNK) {
         const { data } = await supabase.from("athletes").insert(mapped.slice(i,i+CHUNK)).select();
-        if(data) setAthletes(prev=>[...data,...prev]);
+        if(data) setAthletes(prev=>[...data.map(fromDB),...prev]);
       }
     } else {
       const mapped = rows.map(r=>({
         name:r.name||r.athlete||"",company:r.company||r.agency||"",
         category:r.category||categorizeEmail(r.email||""),
-        email:r.email||"",source:r.source||"Import",phone:r.phone||"",notes:r.notes||""
+        email:r.email||"",phone:r.phone||""
       })).filter(r=>r.name||r.email);
       const CHUNK=50;
       for(let i=0;i<mapped.length;i+=CHUNK) {
         const { data } = await supabase.from("contacts").insert(mapped.slice(i,i+CHUNK)).select();
-        if(data) setContacts(prev=>[...data,...prev]);
+        if(data) setContacts(prev=>[...data.map(c=>({...c, athlete:c.name})),...prev]);
       }
     }
   },[]);
