@@ -1623,8 +1623,8 @@ function Dashboard({ athletes }) {
         <div style={{ position:"absolute", right:60, bottom:-50, width:150, height:150,
           borderRadius:"50%", background:WINE, opacity:0.06, pointerEvents:"none" }}/>
         <div style={{ color:TX3, fontSize:12, fontWeight:700, letterSpacing:"0.1em", marginBottom:8 }}>ATLAUA SPORTS CRM</div>
-        <h1 style={{ margin:0, color:TX1, fontSize:32, fontWeight:800, letterSpacing:"-0.02em" }}>
-          Good {new Date().getHours()<12?"morning":"afternoon"} Mr Sound 👋
+        <h1 style={{ margin:0, color:TX1, fontSize:32, fontWeight:800, letterSpacing:"-0.02em" }} className="mobile-text-sm">
+          Good {new Date().getHours()<12?"morning":"afternoon"} Mrs Sound 👋
         </h1>
         <p style={{ margin:"8px 0 0", color:TX2, fontSize:15 }}>Here's your pipeline overview for today · {new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</p>
       </div>
@@ -1638,7 +1638,7 @@ function Dashboard({ athletes }) {
       </div>
 
       {/* Charts row */}
-      <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:16, marginBottom:24 }}>
+      <div className="mobile-grid-1" style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:16, marginBottom:24 }}>
         {/* Trend chart */}
         <Card>
           <div style={{ color:TX1, fontWeight:700, fontSize:15, marginBottom:4 }}>Outreach Trend</div>
@@ -1685,7 +1685,7 @@ function Dashboard({ athletes }) {
       </div>
 
       {/* Pipeline + Top Agencies */}
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+      <div className="mobile-grid-1" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
         {/* Pipeline funnel */}
         <Card>
           <div style={{ color:TX1, fontWeight:700, fontSize:15, marginBottom:18 }}>Pipeline Breakdown</div>
@@ -2000,7 +2000,7 @@ function Pipeline({ athletes, onUpdate, onSelect }) {
     <div>
       <SectionHeader title="Pipeline" sub="Drag athletes between stages"/>
       <SearchInput value={q} onChange={setQ} placeholder="Filter cards..." style={{maxWidth:320,marginBottom:20}}/>
-      <div style={{ display:"grid", gridTemplateColumns:`repeat(${cols.length},1fr)`, gap:12, overflowX:"auto" }}>
+      <div style={{ display:"grid", gridTemplateColumns:`repeat(${cols.length},minmax(220px,1fr))`, gap:12, overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
         {cols.map(col=>{
           const colCards = cards.filter(a=>a.status===col);
           const color    = SCOL[col]||TX2;
@@ -2195,7 +2195,7 @@ function Export({ athletes, contacts }) {
   return (
     <div>
       <SectionHeader title="Export" sub="Download your CRM data as CSV"/>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, maxWidth:800 }}>
+      <div className="mobile-grid-1" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, maxWidth:800 }}>
         <Card>
           <h3 style={{ margin:"0 0 18px", color:TX1, fontSize:15, fontWeight:700 }}>Export Options</h3>
           <div style={{ marginBottom:14 }}>
@@ -2323,6 +2323,8 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [sbCollapsed, setSbCollapsed] = useState(false);
   const [globalQ, setGlobalQ] = useState("");
+  const [mobileNav, setMobileNav] = useState(false);
+  const isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
 
   // Load from Supabase
   useEffect(()=>{
@@ -2411,83 +2413,130 @@ export default function App() {
 
   return (
     <div style={{ display:"flex", height:"100vh", background:BG, color:TX1, fontFamily:"'Codec Pro','Questrial',system-ui,sans-serif", overflow:"hidden" }}>
-      {/* ── SIDEBAR ── */}
-      <aside style={{
-        width:SB_W, background:SB, display:"flex", flexDirection:"column",
-        borderRight:`1px solid ${BD}`, flexShrink:0, transition:"width 0.25s ease",
-        boxShadow:"4px 0 24px rgba(0,0,0,0.4)", position:"relative", zIndex:10, overflow:"hidden"
-      }}>
-        {/* Logo */}
-        <div style={{ padding:`24px ${sbCollapsed?14:20}px 20px`, borderBottom:`1px solid ${BD}`,
-          display:"flex", alignItems:"center", gap:12, overflow:"hidden" }}>
-          <div style={{ flexShrink:0 }}>
-            <AtlauaJaguarLogo size={40}/>
-          </div>
-          {!sbCollapsed && (
-            <div style={{ overflow:"hidden" }}>
-              <div style={{ color:TX1, fontSize:17, fontWeight:800, letterSpacing:"-0.01em", whiteSpace:"nowrap" }}>ATLAUA</div>
-              <div style={{ color:TX3, fontSize:10, letterSpacing:"0.15em", whiteSpace:"nowrap" }}>SPORTS CRM</div>
+      {/* ── SIDEBAR (desktop) ── */}
+      {!isMobile && (
+        <aside style={{
+          width:SB_W, background:SB, display:"flex", flexDirection:"column",
+          borderRight:`1px solid ${BD}`, flexShrink:0, transition:"width 0.25s ease",
+          boxShadow:"4px 0 24px rgba(0,0,0,0.4)", position:"relative", zIndex:10, overflow:"hidden"
+        }}>
+          {/* Logo */}
+          <div style={{ padding:`24px ${sbCollapsed?14:20}px 20px`, borderBottom:`1px solid ${BD}`,
+            display:"flex", alignItems:"center", gap:12, overflow:"hidden" }}>
+            <div style={{ flexShrink:0 }}>
+              <AtlauaJaguarLogo size={40}/>
             </div>
-          )}
-        </div>
-
-        {/* Nav */}
-        <nav style={{ flex:1, padding:"14px 10px", overflowY:"auto" }}>
-          {navItems.map(({ id, label, icon, badge }) => {
-            const active = page===id;
-            return (
-              <div key={id} onClick={()=>setPage(id)} title={sbCollapsed?label:undefined}
-                style={{ display:"flex", alignItems:"center", gap:12, padding:`10px ${sbCollapsed?14:14}px`,
-                  borderRadius:10, cursor:"pointer", marginBottom:2, position:"relative",
-                  justifyContent:sbCollapsed?"center":"flex-start",
-                  background: active ? T+"18" : "transparent",
-                  color: active ? T : TX2,
-                  borderLeft: active ? `3px solid ${T}` : "3px solid transparent",
-                  transition:"all 0.18s" }}
-                onMouseEnter={e=>{ if(!active){ e.currentTarget.style.background=C2; e.currentTarget.style.color=TX1; }}}
-                onMouseLeave={e=>{ if(!active){ e.currentTarget.style.background="transparent"; e.currentTarget.style.color=TX2; }}}>
-                <div style={{ flexShrink:0 }}>{icon}</div>
-                {!sbCollapsed && <span style={{ fontSize:13, fontWeight:active?700:500, flex:1 }}>{label}</span>}
-                {badge>0 && !sbCollapsed && (
-                  <span style={{ background:T+"33", color:T, borderRadius:20, padding:"1px 8px", fontSize:10, fontWeight:700 }}>{badge}</span>
-                )}
-                {badge>0 && sbCollapsed && (
-                  <div style={{ position:"absolute", top:6, right:8, width:8, height:8, borderRadius:"50%", background:T }}/>
-                )}
+            {!sbCollapsed && (
+              <div style={{ overflow:"hidden" }}>
+                <div style={{ color:TX1, fontSize:17, fontWeight:800, letterSpacing:"-0.01em", whiteSpace:"nowrap" }}>ATLAUA</div>
+                <div style={{ color:TX3, fontSize:10, letterSpacing:"0.15em", whiteSpace:"nowrap" }}>SPORTS CRM</div>
               </div>
-            );
-          })}
-        </nav>
-
-        {/* Collapse toggle */}
-        <div style={{ padding:"14px 10px", borderTop:`1px solid ${BD}` }}>
-          <div onClick={()=>setSbCollapsed(c=>!c)}
-            style={{ display:"flex", alignItems:"center", justifyContent:sbCollapsed?"center":"flex-end",
-              gap:8, padding:"8px 14px", borderRadius:10, cursor:"pointer", color:TX3,
-              transition:"all 0.18s" }}
-            onMouseEnter={e=>{ e.currentTarget.style.color=TX1; e.currentTarget.style.background=C2; }}
-            onMouseLeave={e=>{ e.currentTarget.style.color=TX3; e.currentTarget.style.background="transparent"; }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              {sbCollapsed
-                ? <><path d="M13 5l7 7-7 7"/><path d="M4 5l7 7-7 7"/></>
-                : <><path d="M11 5l-7 7 7 7"/><path d="M20 5l-7 7 7 7"/></>}
-            </svg>
-            {!sbCollapsed && <span style={{ fontSize:12 }}>Collapse</span>}
+            )}
           </div>
-        </div>
-      </aside>
+
+          {/* Nav */}
+          <nav style={{ flex:1, padding:"14px 10px", overflowY:"auto" }}>
+            {navItems.map(({ id, label, icon, badge }) => {
+              const active = page===id;
+              return (
+                <div key={id} onClick={()=>setPage(id)} title={sbCollapsed?label:undefined}
+                  style={{ display:"flex", alignItems:"center", gap:12, padding:`10px ${sbCollapsed?14:14}px`,
+                    borderRadius:10, cursor:"pointer", marginBottom:2, position:"relative",
+                    justifyContent:sbCollapsed?"center":"flex-start",
+                    background: active ? T+"18" : "transparent",
+                    color: active ? T : TX2,
+                    borderLeft: active ? `3px solid ${T}` : "3px solid transparent",
+                    transition:"all 0.18s" }}
+                  onMouseEnter={e=>{ if(!active){ e.currentTarget.style.background=C2; e.currentTarget.style.color=TX1; }}}
+                  onMouseLeave={e=>{ if(!active){ e.currentTarget.style.background="transparent"; e.currentTarget.style.color=TX2; }}}>
+                  <div style={{ flexShrink:0 }}>{icon}</div>
+                  {!sbCollapsed && <span style={{ fontSize:13, fontWeight:active?700:500, flex:1 }}>{label}</span>}
+                  {badge>0 && !sbCollapsed && (
+                    <span style={{ background:T+"33", color:T, borderRadius:20, padding:"1px 8px", fontSize:10, fontWeight:700 }}>{badge}</span>
+                  )}
+                  {badge>0 && sbCollapsed && (
+                    <div style={{ position:"absolute", top:6, right:8, width:8, height:8, borderRadius:"50%", background:T }}/>
+                  )}
+                </div>
+              );
+            })}
+          </nav>
+
+          {/* Collapse toggle */}
+          <div style={{ padding:"14px 10px", borderTop:`1px solid ${BD}` }}>
+            <div onClick={()=>setSbCollapsed(c=>!c)}
+              style={{ display:"flex", alignItems:"center", justifyContent:sbCollapsed?"center":"flex-end",
+                gap:8, padding:"8px 14px", borderRadius:10, cursor:"pointer", color:TX3,
+                transition:"all 0.18s" }}
+              onMouseEnter={e=>{ e.currentTarget.style.color=TX1; e.currentTarget.style.background=C2; }}
+              onMouseLeave={e=>{ e.currentTarget.style.color=TX3; e.currentTarget.style.background="transparent"; }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                {sbCollapsed
+                  ? <><path d="M13 5l7 7-7 7"/><path d="M4 5l7 7-7 7"/></>
+                  : <><path d="M11 5l-7 7 7 7"/><path d="M20 5l-7 7 7 7"/></>}
+              </svg>
+              {!sbCollapsed && <span style={{ fontSize:12 }}>Collapse</span>}
+            </div>
+          </div>
+        </aside>
+      )}
+
+      {/* ── MOBILE NAV OVERLAY ── */}
+      {isMobile && mobileNav && (
+        <>
+          <div onClick={()=>setMobileNav(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)", zIndex:998 }}/>
+          <div style={{ position:"fixed", left:0, top:0, bottom:0, width:260, background:SB,
+            borderRight:`1px solid ${BD}`, zIndex:999, display:"flex", flexDirection:"column",
+            boxShadow:"4px 0 32px rgba(0,0,0,0.6)" }}>
+            <div style={{ padding:"20px 18px", borderBottom:`1px solid ${BD}`, display:"flex", alignItems:"center", gap:12 }}>
+              <AtlauaJaguarLogo size={36}/>
+              <div>
+                <div style={{ color:TX1, fontSize:16, fontWeight:800 }}>ATLAUA</div>
+                <div style={{ color:TX3, fontSize:9, letterSpacing:"0.15em" }}>SPORTS CRM</div>
+              </div>
+              <button onClick={()=>setMobileNav(false)} style={{ marginLeft:"auto", background:"none", border:"none", color:TX2, fontSize:20, cursor:"pointer" }}>✕</button>
+            </div>
+            <nav style={{ flex:1, padding:"12px 10px", overflowY:"auto" }}>
+              {navItems.map(({ id, label, icon, badge }) => {
+                const active = page===id;
+                return (
+                  <div key={id} onClick={()=>{setPage(id);setMobileNav(false);}}
+                    style={{ display:"flex", alignItems:"center", gap:12, padding:"11px 14px",
+                      borderRadius:10, cursor:"pointer", marginBottom:2,
+                      background: active ? T+"18" : "transparent",
+                      color: active ? T : TX2,
+                      borderLeft: active ? `3px solid ${T}` : "3px solid transparent" }}>
+                    <div style={{ flexShrink:0 }}>{icon}</div>
+                    <span style={{ fontSize:13, fontWeight:active?700:500, flex:1 }}>{label}</span>
+                    {badge>0 && <span style={{ background:T+"33", color:T, borderRadius:20, padding:"1px 8px", fontSize:10, fontWeight:700 }}>{badge}</span>}
+                  </div>
+                );
+              })}
+            </nav>
+          </div>
+        </>
+      )}
 
       {/* ── MAIN ── */}
       <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
         {/* Top bar */}
-        <header style={{ height:56, background:SB, borderBottom:`1px solid ${BD}`,
-          display:"flex", alignItems:"center", padding:"0 28px", gap:14, flexShrink:0, zIndex:9 }}>
+        <header style={{ height:isMobile?50:56, background:SB, borderBottom:`1px solid ${BD}`,
+          display:"flex", alignItems:"center", padding:isMobile?"0 14px":"0 28px", gap:isMobile?10:14, flexShrink:0, zIndex:9 }}>
+          {isMobile && (
+            <button onClick={()=>setMobileNav(true)} style={{ background:"none", border:"none", color:TX1, cursor:"pointer", padding:4, display:"flex" }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
+            </button>
+          )}
           <div style={{ color:TX2, fontSize:13, fontWeight:600 }}>{page}</div>
-          <div style={{ flex:1, maxWidth:380, marginLeft:24 }}>
-            <SearchInput value={globalQ} onChange={setGlobalQ} placeholder="Global search..."/>
-          </div>
-          <div style={{ marginLeft:"auto", display:"flex", gap:10, alignItems:"center" }}>
-            <Btn size="sm" onClick={()=>setShowAdd(true)} icon="+">New</Btn>
+          {!isMobile && (
+            <div style={{ flex:1, maxWidth:380, marginLeft:24 }}>
+              <SearchInput value={globalQ} onChange={setGlobalQ} placeholder="Global search..."/>
+            </div>
+          )}
+          <div style={{ marginLeft:"auto", display:"flex", gap:isMobile?8:10, alignItems:"center" }}>
+            <Btn size="sm" onClick={()=>setShowAdd(true)} icon="+">{isMobile?"":"New"}</Btn>
             <div style={{ width:32, height:32, borderRadius:"50%", background:T+"22",
               border:`1px solid ${T}44`, display:"flex", alignItems:"center", justifyContent:"center",
               color:T, fontSize:13, fontWeight:700, cursor:"pointer" }}>A</div>
@@ -2495,7 +2544,7 @@ export default function App() {
         </header>
 
         {/* Content */}
-        <main style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}>
+        <main style={{ flex:1, overflowY:"auto", padding:isMobile?"16px 14px":"28px 32px" }}>
           {page==="Dashboard" && <Dashboard athletes={athletes}/>}
           {page==="Athletes"  && <Athletes  athletes={athletes} onSelect={setSel} onImport={importBatch}/>}
           {page==="Agencies"  && <Agencies  athletes={athletes} onSelect={setSel}/>}
