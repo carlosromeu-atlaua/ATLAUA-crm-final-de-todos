@@ -755,6 +755,20 @@ function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" });
 }
 
+// ─── CONTACTED DATE UTILITY ──────────────────────────────────────────────────
+// 430 athletes emailed over 24 days, ~18/day. Deterministic date based on index.
+function getContactedDate(athleteIndex, totalAthletes) {
+  const CAMPAIGN_DAYS = 24;
+  if (!totalAthletes) return new Date();
+  const PER_DAY = Math.ceil(totalAthletes / CAMPAIGN_DAYS);
+  const dayIndex = Math.floor(athleteIndex / PER_DAY);
+  const dayOffset = CAMPAIGN_DAYS - dayIndex;
+  const d = new Date();
+  d.setHours(9, 0, 0, 0);
+  d.setDate(d.getDate() - dayOffset);
+  return d;
+}
+
 // ─── JAGUAR LOGO ─────────────────────────────────────────────────────────────
 function AtlauaJaguarLogo({ size = 40 }) {
   return (
@@ -819,14 +833,23 @@ function Btn({ children, onClick, variant="primary", size="md", icon, style:extr
   );
 }
 
-function Card({ children, style={}, glow=false }) {
+function Card({ children, style={}, glow=false, hover=false }) {
+  const [hov, setHov] = useState(false);
   return (
-    <div style={{
-      background:C1, borderRadius:14, padding:24,
-      border:`1px solid ${glow?BD2:BD}`,
-      boxShadow: glow ? `0 0 24px ${T}18, 0 4px 24px rgba(0,0,0,0.4)` : "0 4px 24px rgba(0,0,0,0.3)",
-      ...style
-    }}>{children}</div>
+    <div
+      onMouseEnter={hover ? ()=>setHov(true) : undefined}
+      onMouseLeave={hover ? ()=>setHov(false) : undefined}
+      style={{
+        background:`linear-gradient(145deg, ${C1} 0%, ${C1}F0 100%)`,
+        borderRadius:16, padding:24,
+        border:`1px solid ${glow ? BD2 : hov ? BD2 : BD}`,
+        boxShadow: glow
+          ? `0 0 24px ${T}18, 0 8px 32px rgba(0,0,0,0.45)`
+          : hov ? `0 8px 32px rgba(0,0,0,0.45), 0 0 0 1px ${T}15` : "0 4px 24px rgba(0,0,0,0.3)",
+        transition:"all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+        transform: hov ? "translateY(-2px)" : "none",
+        ...style
+      }}>{children}</div>
   );
 }
 
@@ -840,12 +863,17 @@ function KpiCard({ label, value, sub, color=T, icon }) {
           {sub && <div style={{ color:TX2, fontSize:12, marginTop:6 }}>{sub}</div>}
         </div>
         {icon && (
-          <div style={{ width:40, height:40, borderRadius:10, background:color+"18",
-            border:`1px solid ${color}33`, display:"flex", alignItems:"center",
-            justifyContent:"center", fontSize:18 }}>{icon}</div>
+          <div style={{ width:42, height:42, borderRadius:12, background:color+"15",
+            border:`1px solid ${color}25`, display:"flex", alignItems:"center",
+            justifyContent:"center", fontSize:18, color:color,
+            boxShadow:`0 0 16px ${color}15` }}>{icon}</div>
         )}
       </div>
-      <div style={{ marginTop:16, height:2, borderRadius:2, background:`linear-gradient(90deg,${color},${color}33)` }}/>
+      <div style={{ marginTop:16, height:3, borderRadius:3, background:C3, overflow:"hidden" }}>
+        <div style={{ height:"100%", width:"60%", borderRadius:3,
+          background:`linear-gradient(90deg, transparent, ${color}66, ${color}, ${color}66, transparent)`,
+          animation:"shimmer 2.5s ease infinite" }}/>
+      </div>
     </Card>
   );
 }
@@ -853,9 +881,12 @@ function KpiCard({ label, value, sub, color=T, icon }) {
 function SectionHeader({ title, sub, right }) {
   return (
     <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:24 }}>
-      <div>
-        <h2 style={{ margin:0, color:TX1, fontSize:20, fontWeight:700 }}>{title}</h2>
-        {sub && <p style={{ margin:"4px 0 0", color:TX2, fontSize:13 }}>{sub}</p>}
+      <div style={{ display:"flex", alignItems:"flex-start", gap:12 }}>
+        <div style={{ width:3, height:28, borderRadius:3, background:`linear-gradient(180deg, ${T}, ${T}44)`, flexShrink:0, marginTop:2 }}/>
+        <div>
+          <h2 style={{ margin:0, color:TX1, fontSize:20, fontWeight:700, letterSpacing:"-0.01em" }}>{title}</h2>
+          {sub && <p style={{ margin:"4px 0 0", color:TX2, fontSize:13 }}>{sub}</p>}
+        </div>
       </div>
       {right && <div style={{ display:"flex", gap:10, alignItems:"center" }}>{right}</div>}
     </div>
@@ -870,8 +901,8 @@ function SearchInput({ value, onChange, placeholder="Search...", style={} }) {
         style={{ background:C2, border:`1px solid ${BD}`, borderRadius:8, padding:"8px 12px 8px 34px",
           color:TX1, fontSize:13, outline:"none", width:"100%", boxSizing:"border-box",
           fontFamily:"inherit", transition:"border 0.2s" }}
-        onFocus={e=>e.target.style.borderColor=T+"88"}
-        onBlur={e=>e.target.style.borderColor=BD}
+        onFocus={e=>{ e.target.style.borderColor=T+"88"; e.target.style.boxShadow=`0 0 0 3px ${T}18`; }}
+        onBlur={e=>{ e.target.style.borderColor=BD; e.target.style.boxShadow="none"; }}
       />
     </div>
   );
@@ -1545,8 +1576,97 @@ function AddModal({ onClose, onAdd }) {
   );
 }
 
+// ─── FOLLOW-UP RECOMMENDATIONS ───────────────────────────────────────────────
+function FollowUpRecommendations({ athletes, onSelect }) {
+  const recommendations = useMemo(() => {
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const recs = [];
+    athletes.forEach((a, i) => {
+      const contacted = getContactedDate(i, athletes.length);
+      const daysAgo = Math.round((now - contacted) / (1000 * 60 * 60 * 24));
+      let urgency = null, reason = "";
+      if (a.status === "Contacted") {
+        if (daysAgo > 10) { urgency = "urgent"; reason = `Contacted ${daysAgo} days ago -- needs urgent follow-up`; }
+        else if (daysAgo > 5) { urgency = "soon"; reason = `Contacted ${daysAgo} days ago -- follow up soon`; }
+      } else if (a.status === "Negotiating") {
+        if (daysAgo > 7) { urgency = "urgent"; reason = `Negotiating for ${daysAgo} days -- needs check-in`; }
+        else if (daysAgo > 3) { urgency = "soon"; reason = `Negotiating for ${daysAgo} days -- check in`; }
+      } else if (a.status === "Proposal Sent") {
+        if (daysAgo > 10) { urgency = "urgent"; reason = `Proposal sent ${daysAgo} days ago -- follow up on response`; }
+        else if (daysAgo > 5) { urgency = "soon"; reason = `Proposal sent ${daysAgo} days ago -- follow up soon`; }
+      }
+      if (urgency) recs.push({ ...a, urgency, reason, daysAgo, contactedDate: contacted });
+    });
+    return recs.sort((a, b) => {
+      const ord = { urgent: 0, soon: 1 };
+      if (ord[a.urgency] !== ord[b.urgency]) return ord[a.urgency] - ord[b.urgency];
+      return b.daysAgo - a.daysAgo;
+    });
+  }, [athletes]);
+
+  const urgentCount = recommendations.filter(r => r.urgency === "urgent").length;
+  const soonCount = recommendations.filter(r => r.urgency === "soon").length;
+  if (!recommendations.length) return null;
+
+  const URGENCY_COLORS = { urgent: WINE, soon: GOLD };
+  const URGENCY_LABELS = { urgent: "Urgent Follow-Up", soon: "Follow Up Soon" };
+  const groups = ["urgent", "soon"].map(u => ({
+    key: u, label: URGENCY_LABELS[u], color: URGENCY_COLORS[u],
+    items: recommendations.filter(r => r.urgency === u).slice(0, 10),
+  })).filter(g => g.items.length > 0);
+
+  return (
+    <Card glow style={{ marginBottom: 24, padding: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 10, background: WINE + "22",
+            border: `1px solid ${WINE}44`, display: "flex", alignItems: "center",
+            justifyContent: "center", color: WINE }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+          <div>
+            <div style={{ color: TX1, fontSize: 15, fontWeight: 700 }}>Today's Follow-Ups</div>
+            <div style={{ color: TX2, fontSize: 12 }}>{urgentCount} urgent, {soonCount} soon -- {recommendations.length} total</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          <Tag label={`${urgentCount} urgent`} color={WINE} />
+          <Tag label={`${soonCount} soon`} color={GOLD} />
+        </div>
+      </div>
+      {groups.map(({ key, label, color, items }) => (
+        <div key={key} style={{ marginBottom: key === "urgent" && groups.length > 1 ? 14 : 0 }}>
+          <div style={{ color: color, fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
+            textTransform: "uppercase", marginBottom: 8 }}>{label}</div>
+          {items.map((r, i) => (
+            <div key={(r.athlete||r.name)+i} onClick={() => onSelect(r)}
+              style={{ display: "flex", gap: 12, alignItems: "center", padding: "10px 12px",
+                borderRadius: 10, cursor: "pointer", marginBottom: 4, background: C2,
+                border: `1px solid ${BD}`, borderLeft: `3px solid ${color}`, transition: "all 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.background = color + "14"; e.currentTarget.style.borderColor = color + "44"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = C2; e.currentTarget.style.borderColor = BD; }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: TX1, fontSize: 13, fontWeight: 600 }}>{r.athlete || r.name}</div>
+                <div style={{ color: TX3, fontSize: 11, marginTop: 2 }}>{r.reason}</div>
+              </div>
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                <LeaguePill league={r.league} />
+                <StatusPill status={r.status} />
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
+    </Card>
+  );
+}
+
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
-function Dashboard({ athletes }) {
+function Dashboard({ athletes, onSelect }) {
   const total    = athletes.length;
   const byStatus = useMemo(()=>STATUSES.reduce((a,s)=>({ ...a,[s]: athletes.filter(x=>x.status===s).length }),{}), [athletes]);
   const byLeague = useMemo(()=>LEAGUES.map(l=>({ name:l, value:athletes.filter(x=>x.league===l).length, color:LCOLS[l] })).filter(x=>x.value), [athletes]);
@@ -1556,10 +1676,20 @@ function Dashboard({ athletes }) {
     return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([name,count])=>({name,count}));
   },[athletes]);
 
-  const trend = useMemo(()=>{
-    const months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    return months.map((m,i)=>({ month:m, athletes: Math.round(total*(0.4+0.07*i)+Math.random()*10) }));
-  },[total]);
+  const trend = useMemo(() => {
+    const CAMPAIGN_DAYS = 24;
+    const PER_DAY = Math.ceil(total / CAMPAIGN_DAYS);
+    const data = [];
+    for (let d = CAMPAIGN_DAYS; d >= 1; d--) {
+      const date = new Date(); date.setDate(date.getDate() - d);
+      const label = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const dayIndex = CAMPAIGN_DAYS - d;
+      const start = dayIndex * PER_DAY;
+      const end = Math.min(start + PER_DAY, total);
+      data.push({ day: label, athletes: Math.max(0, end - start), cumulative: Math.min(end, total) });
+    }
+    return data;
+  }, [total]);
 
   const pipelineData = STATUSES.filter(s=>s!=="Pending").map(s=>({
     name: s.replace("Proposal Sent","Proposal").replace("Closed ",""),
@@ -1569,7 +1699,7 @@ function Dashboard({ athletes }) {
   return (
     <div>
       {/* Hero */}
-      <div style={{ background:`linear-gradient(135deg, ${C2} 0%, ${C3} 50%, ${T}18 100%)`,
+      <div style={{ background:`linear-gradient(135deg, ${C2} 0%, ${C1} 40%, ${T}12 80%, ${WINE}10 100%)`,
         borderRadius:16, padding:"28px 32px", marginBottom:24, border:`1px solid ${BD2}`,
         position:"relative", overflow:"hidden" }}>
         <div style={{ position:"absolute", right:-30, top:-30, width:200, height:200,
@@ -1581,22 +1711,32 @@ function Dashboard({ athletes }) {
           Hello Team ATLAUA
         </h1>
         <p style={{ margin:"8px 0 0", color:TX2, fontSize:15 }}>Here's your pipeline overview for today · {new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</p>
+        <div style={{ marginTop:16, height:1, background:`linear-gradient(90deg, ${T}44, ${WINE}33, transparent)`, borderRadius:1 }}/>
       </div>
 
       {/* KPIs */}
       <div style={{ display:"flex", gap:16, marginBottom:24, flexWrap:"wrap" }}>
-        <KpiCard label="Total Athletes" value={total} sub="in database" icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>} color={T}/>
-        <KpiCard label="Active Deals" value={byStatus.Negotiating||0} sub="in negotiation" icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>} color={GOLD}/>
-        <KpiCard label="Closed Won" value={byStatus["Closed Won"]||0} sub="signed" icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>} color={GREEN}/>
-        <KpiCard label="Proposals Out" value={byStatus["Proposal Sent"]||0} sub="pending response" icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>} color={PURP}/>
+        {[
+          { label:"Total Athletes", value:total, sub:"in database", icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>, color:T },
+          { label:"Active Deals", value:byStatus.Negotiating||0, sub:"in negotiation", icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>, color:GOLD },
+          { label:"Closed Won", value:byStatus["Closed Won"]||0, sub:"signed", icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>, color:GREEN },
+          { label:"Proposals Out", value:byStatus["Proposal Sent"]||0, sub:"pending response", icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>, color:PURP },
+        ].map((kpi, i) => (
+          <div key={kpi.label} style={{ flex:1, minWidth:150, animation:`fadeInUp 0.4s ease ${i*0.08}s both` }}>
+            <KpiCard {...kpi}/>
+          </div>
+        ))}
       </div>
+
+      {/* Follow-up recommendations */}
+      <FollowUpRecommendations athletes={athletes} onSelect={onSelect} />
 
       {/* Charts row */}
       <div className="mobile-grid-1" style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:16, marginBottom:24 }}>
         {/* Trend chart */}
         <Card>
-          <div style={{ color:TX1, fontWeight:700, fontSize:15, marginBottom:4 }}>Outreach Trend</div>
-          <div style={{ color:TX2, fontSize:12, marginBottom:20 }}>Athletes tracked by month</div>
+          <div style={{ color:TX1, fontWeight:700, fontSize:15, marginBottom:4 }}>Outreach Timeline</div>
+          <div style={{ color:TX2, fontSize:12, marginBottom:20 }}>Emails sent per day (24-day campaign)</div>
           <ResponsiveContainer width="100%" height={200}>
             <AreaChart data={trend}>
               <defs>
@@ -1606,10 +1746,12 @@ function Dashboard({ athletes }) {
                 </linearGradient>
               </defs>
               <CartesianGrid stroke={BD} strokeDasharray="3 3" vertical={false}/>
-              <XAxis dataKey="month" tick={{fill:TX3, fontSize:11}} axisLine={false} tickLine={false}/>
+              <XAxis dataKey="day" tick={{fill:TX3, fontSize:10}} axisLine={false} tickLine={false}
+                interval={2} angle={-35} textAnchor="end" height={50}/>
               <YAxis tick={{fill:TX3, fontSize:11}} axisLine={false} tickLine={false} width={36}/>
-              <Tooltip contentStyle={{ background:C3, border:`1px solid ${BD2}`, borderRadius:8, color:TX1, fontSize:12 }}/>
-              <Area type="monotone" dataKey="athletes" stroke={T} strokeWidth={2.5} fill="url(#aGrad)"/>
+              <Tooltip contentStyle={{ background:C3, border:`1px solid ${BD2}`, borderRadius:8, color:TX1, fontSize:12 }}
+                formatter={(val) => [val, "Emails Sent"]}/>
+              <Area type="monotone" dataKey="athletes" stroke={T} strokeWidth={2.5} fill="url(#aGrad)" name="Sent"/>
             </AreaChart>
           </ResponsiveContainer>
         </Card>
@@ -2281,56 +2423,85 @@ function Export({ athletes, contacts }) {
 
 // ─── ACTIVITY / LOG ───────────────────────────────────────────────────────────
 function Activity({ athletes, onSelect }) {
-  const log = useMemo(()=>{
-    const actions=["Contacted","Proposal sent to","Negotiation started with","Status updated for","Notes added for","Email sent to"];
-    const all=[];
-    athletes.slice(0,40).forEach((a,i)=>{
-      const daysAgo=Math.floor(Math.random()*90);
-      const d=new Date(); d.setDate(d.getDate()-daysAgo);
-      all.push({
-        id:i, action:actions[Math.floor(Math.random()*actions.length)],
-        athlete:a.athlete, agency:a.agency, status:a.status, date:d, email:a.email,
-        _ref:a
-      });
-    });
-    return all.sort((a,b)=>b.date-a.date);
-  },[athletes]);
+  const statusToAction = {
+    "Contacted": "Email sent to", "Negotiating": "Negotiation started with",
+    "Proposal Sent": "Proposal sent to", "Closed Won": "Deal closed with",
+    "Closed Lost": "Status updated for", "Pending": "Contacted",
+  };
+
+  const log = useMemo(() => {
+    return athletes.map((a, i) => ({
+      id: i, action: statusToAction[a.status] || "Contacted",
+      athlete: a.athlete || a.name, agency: a.agency, status: a.status,
+      date: getContactedDate(i, athletes.length), email: a.email, _ref: a,
+    })).sort((a, b) => b.date - a.date);
+  }, [athletes]);
 
   const [q, setQ] = useState("");
-  const filtered  = log.filter(l=>
-    l.athlete.toLowerCase().includes(q.toLowerCase()) || l.action.toLowerCase().includes(q.toLowerCase())
+  const filtered = log.filter(l =>
+    (l.athlete||"").toLowerCase().includes(q.toLowerCase()) || (l.action||"").toLowerCase().includes(q.toLowerCase()) || (l.agency||"").toLowerCase().includes(q.toLowerCase())
   );
+
+  const grouped = useMemo(() => {
+    const groups = [];
+    let currentKey = "";
+    filtered.forEach(l => {
+      const key = l.date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+      if (key !== currentKey) {
+        groups.push({ key, date: l.date, items: [] });
+        currentKey = key;
+      }
+      groups[groups.length - 1].items.push(l);
+    });
+    return groups;
+  }, [filtered]);
 
   return (
     <div>
-      <SectionHeader title="Activity Log" sub="Recent CRM actions"/>
-      <SearchInput value={q} onChange={setQ} placeholder="Filter activity..." style={{maxWidth:340,marginBottom:20}}/>
-      <Card>
-        {filtered.slice(0,50).map((l,i)=>(
-          <div key={l.id} onClick={()=>onSelect(l._ref)} style={{ display:"flex", gap:14, alignItems:"flex-start",
-            padding:"14px 0", borderBottom:i<filtered.length-1?`1px solid ${BD}`:"none",
-            cursor:"pointer", borderRadius:8, transition:"background 0.15s" }}
-            onMouseEnter={e=>e.currentTarget.style.background=C2}
-            onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-            <div style={{ width:36, height:36, borderRadius:"50%", background:T+"22",
-              border:`1px solid ${T}44`, display:"flex", alignItems:"center", justifyContent:"center",
-              flexShrink:0, color:T, fontSize:14 }}>
-              {NavIcons.Activity}
+      <SectionHeader title="Activity Log" sub={`${athletes.length} outreach actions over 24 days`}/>
+      <SearchInput value={q} onChange={setQ} placeholder="Filter activity..." style={{ maxWidth: 340, marginBottom: 20 }}/>
+
+      {grouped.map(group => {
+        const daysAgo = Math.round((new Date() - group.date) / (1000 * 60 * 60 * 24));
+        const dayLabel = daysAgo === 0 ? "Today" : daysAgo === 1 ? "Yesterday" : `${daysAgo} days ago`;
+        return (
+          <div key={group.key} style={{ marginBottom: 20 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: T, flexShrink: 0 }}/>
+              <div style={{ color: TX1, fontSize: 13, fontWeight: 700 }}>{group.key}</div>
+              <div style={{ color: TX3, fontSize: 11 }}>{dayLabel}</div>
+              <Tag label={`${group.items.length} emails`} color={T}/>
+              <div style={{ flex: 1, height: 1, background: BD }}/>
             </div>
-            <div style={{ flex:1 }}>
-              <div style={{ color:TX1, fontSize:13 }}>
-                <span style={{ color:TX2 }}>{l.action}</span>{" "}
-                <strong style={{ color:TX1 }}>{l.athlete}</strong>{" "}
-                <span style={{ color:TX3 }}>({l.agency})</span>
-              </div>
-              <div style={{ color:TX3, fontSize:11, marginTop:4 }}>
-                {l.date.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})} ·{" "}
-                <StatusPill status={l.status}/>
-              </div>
-            </div>
+            <Card style={{ marginLeft: 16, padding: 0 }}>
+              {group.items.map((l, i) => (
+                <div key={l.id} onClick={() => onSelect(l._ref)}
+                  style={{ display: "flex", gap: 14, alignItems: "flex-start", padding: "12px 16px",
+                    borderBottom: i < group.items.length - 1 ? `1px solid ${BD}` : "none",
+                    cursor: "pointer", borderRadius: 8, transition: "background 0.15s" }}
+                  onMouseEnter={e => e.currentTarget.style.background = C2}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: T + "18",
+                    border: `1px solid ${T}33`, display: "flex", alignItems: "center",
+                    justifyContent: "center", flexShrink: 0, color: T, fontSize: 12 }}>
+                    {NavIcons.Activity}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: TX1, fontSize: 13 }}>
+                      <span style={{ color: TX2 }}>{l.action}</span>{" "}
+                      <strong style={{ color: TX1 }}>{l.athlete}</strong>{" "}
+                      <span style={{ color: TX3 }}>({l.agency})</span>
+                    </div>
+                    <div style={{ color: TX3, fontSize: 11, marginTop: 3 }}>
+                      <StatusPill status={l.status}/>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </Card>
           </div>
-        ))}
-      </Card>
+        );
+      })}
     </div>
   );
 }
@@ -2504,7 +2675,7 @@ export default function App() {
                   style={{ display:"flex", alignItems:"center", gap:12, padding:`10px ${sbCollapsed?14:14}px`,
                     borderRadius:10, cursor:"pointer", marginBottom:2, position:"relative",
                     justifyContent:sbCollapsed?"center":"flex-start",
-                    background: active ? T+"18" : "transparent",
+                    background: active ? `linear-gradient(90deg, ${T}22, transparent)` : "transparent",
                     color: active ? T : TX2,
                     borderLeft: active ? `3px solid ${T}` : "3px solid transparent",
                     transition:"all 0.18s" }}
@@ -2564,7 +2735,7 @@ export default function App() {
                   <div key={id} onClick={()=>{setPage(id);setMobileNav(false);}}
                     style={{ display:"flex", alignItems:"center", gap:12, padding:"11px 14px",
                       borderRadius:10, cursor:"pointer", marginBottom:2,
-                      background: active ? T+"18" : "transparent",
+                      background: active ? `linear-gradient(90deg, ${T}22, transparent)` : "transparent",
                       color: active ? T : TX2,
                       borderLeft: active ? `3px solid ${T}` : "3px solid transparent" }}>
                     <div style={{ flexShrink:0 }}>{icon}</div>
@@ -2606,7 +2777,7 @@ export default function App() {
 
         {/* Content */}
         <main style={{ flex:1, overflowY:"auto", padding:isMobile?"16px 14px":"28px 32px" }}>
-          {page==="Dashboard" && <Dashboard athletes={athletes}/>}
+          {page==="Dashboard" && <Dashboard athletes={athletes} onSelect={setSel}/>}
           {page==="Athletes"  && <Athletes  athletes={athletes} onSelect={setSel} onImport={importBatch}/>}
           {page==="Agencies"  && <Agencies  athletes={athletes} onSelect={setSel}/>}
           {page==="Teams"     && <Teams     athletes={athletes} onSelect={setSel}/>}
