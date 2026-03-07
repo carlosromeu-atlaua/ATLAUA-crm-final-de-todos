@@ -691,6 +691,14 @@ const TX1   = "#FFFFFF";
 const TX2   = "rgba(255,248,232,0.55)";
 const TX3   = "rgba(255,248,232,0.28)";
 
+// Shadow scale
+const SH_SM = "0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2)";
+const SH_MD = "0 4px 16px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.2)";
+const SH_LG = "0 12px 40px rgba(0,0,0,0.45), 0 4px 12px rgba(0,0,0,0.3)";
+const SH_GLOW = (c) => `0 0 24px ${c}18, 0 8px 32px rgba(0,0,0,0.4)`;
+// Radius scale
+const R_SM = 8, R_MD = 12, R_LG = 16, R_XL = 20, R_PILL = 100;
+
 const SCOL  = { Contacted:T, Negotiating:GOLD, "Proposal Sent":PURP, "Closed Won":GREEN, "Closed Lost":"#444", Pending:TX3 };
 const PCOLS = [T, WINE, GOLD, PURP, ROSE, GREEN];
 const LCOLS = { NFL:WINE, NBA:T, NHL:PURP, MLB:GREEN, UFC:GOLD };
@@ -840,52 +848,68 @@ function Card({ children, style={}, glow=false, hover=false }) {
       onMouseEnter={hover ? ()=>setHov(true) : undefined}
       onMouseLeave={hover ? ()=>setHov(false) : undefined}
       style={{
-        background:`linear-gradient(145deg, ${C1} 0%, ${C1}F0 100%)`,
-        borderRadius:16, padding:24,
+        background:C1, borderRadius:R_LG, padding:24,
         border:`1px solid ${glow ? BD2 : hov ? BD2 : BD}`,
-        boxShadow: glow
-          ? `0 0 24px ${T}18, 0 8px 32px rgba(0,0,0,0.45)`
-          : hov ? `0 8px 32px rgba(0,0,0,0.45), 0 0 0 1px ${T}15` : "0 4px 24px rgba(0,0,0,0.3)",
-        transition:"all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-        transform: hov ? "translateY(-2px)" : "none",
+        boxShadow: glow ? SH_GLOW(T) : hov ? SH_LG : SH_MD,
+        transition:"all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        transform: hov ? "translateY(-3px)" : "none",
         ...style
       }}>{children}</div>
   );
 }
 
 function KpiCard({ label, value, sub, color=T, icon }) {
+  const [hov, setHov] = useState(false);
   return (
-    <Card style={{ flex:1, minWidth:150 }}>
+    <div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+      style={{ flex:1, minWidth:160, background:C1, borderRadius:R_LG, padding:"22px 24px",
+        border:`1px solid ${hov ? color+"44" : BD}`,
+        boxShadow: hov ? `0 8px 30px rgba(0,0,0,0.4), 0 0 20px ${color}12` : SH_MD,
+        transition:"all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        transform: hov ? "translateY(-3px)" : "none",
+        position:"relative", overflow:"hidden" }}>
+      <div style={{ position:"absolute", top:0, left:0, right:0, height:3,
+        background:`linear-gradient(90deg, ${color}, ${color}66, transparent)`,
+        borderRadius:`${R_LG}px ${R_LG}px 0 0` }}/>
+      <div style={{ position:"absolute", right:-20, top:-20, width:80, height:80,
+        borderRadius:"50%", background:color, opacity:hov?0.08:0.04, pointerEvents:"none",
+        transition:"opacity 0.3s" }}/>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
         <div>
-          <div style={{ color:TX3, fontSize:11, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:8 }}>{label}</div>
-          <div style={{ color:TX1, fontSize:28, fontWeight:700, lineHeight:1 }}>{value}</div>
-          {sub && <div style={{ color:TX2, fontSize:12, marginTop:6 }}>{sub}</div>}
+          <div style={{ color:TX3, fontSize:10, fontWeight:700, letterSpacing:"0.12em",
+            textTransform:"uppercase", marginBottom:10 }}>{label}</div>
+          <div style={{ color:TX1, fontSize:32, fontWeight:800, lineHeight:1,
+            letterSpacing:"-0.03em" }}>{value}</div>
+          {sub && <div style={{ color:TX2, fontSize:12, marginTop:8, fontWeight:500 }}>{sub}</div>}
         </div>
         {icon && (
-          <div style={{ width:42, height:42, borderRadius:12, background:color+"15",
-            border:`1px solid ${color}25`, display:"flex", alignItems:"center",
+          <div style={{ width:44, height:44, borderRadius:R_MD, background:color+"12",
+            border:`1px solid ${color}22`, display:"flex", alignItems:"center",
             justifyContent:"center", fontSize:18, color:color,
-            boxShadow:`0 0 16px ${color}15` }}>{icon}</div>
+            transition:"all 0.3s",
+            ...(hov?{background:color+"20",boxShadow:`0 0 20px ${color}20`}:{}) }}>{icon}</div>
         )}
       </div>
-      <div style={{ marginTop:16, height:3, borderRadius:3, background:C3, overflow:"hidden" }}>
+      <div style={{ marginTop:18, height:3, borderRadius:3, background:C3, overflow:"hidden" }}>
         <div style={{ height:"100%", width:"60%", borderRadius:3,
           background:`linear-gradient(90deg, transparent, ${color}66, ${color}, ${color}66, transparent)`,
           animation:"shimmer 2.5s ease infinite" }}/>
       </div>
-    </Card>
+    </div>
   );
 }
 
 function SectionHeader({ title, sub, right }) {
   return (
-    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:24 }}>
-      <div style={{ display:"flex", alignItems:"flex-start", gap:12 }}>
-        <div style={{ width:3, height:28, borderRadius:3, background:`linear-gradient(180deg, ${T}, ${T}44)`, flexShrink:0, marginTop:2 }}/>
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:28 }}>
+      <div style={{ display:"flex", alignItems:"flex-start", gap:14 }}>
+        <div style={{ width:4, height:32, borderRadius:4,
+          background:`linear-gradient(180deg, ${T}, ${WINE})`,
+          flexShrink:0, marginTop:2 }}/>
         <div>
-          <h2 style={{ margin:0, color:TX1, fontSize:20, fontWeight:700, letterSpacing:"-0.01em" }}>{title}</h2>
-          {sub && <p style={{ margin:"4px 0 0", color:TX2, fontSize:13 }}>{sub}</p>}
+          <h2 style={{ margin:0, color:TX1, fontSize:24, fontWeight:800,
+            letterSpacing:"-0.025em", lineHeight:1.1 }}>{title}</h2>
+          {sub && <p style={{ margin:"6px 0 0", color:TX2, fontSize:13, fontWeight:500 }}>{sub}</p>}
         </div>
       </div>
       {right && <div style={{ display:"flex", gap:10, alignItems:"center" }}>{right}</div>}
@@ -1380,11 +1404,12 @@ function GmailConnectModal({ onClose, onImport }) {
 }
 
 // ─── ATHLETE PANEL ─────────────────────────────────────────────────────────────
-function Panel({ a, onClose, onSave }) {
+function Panel({ a, onClose, onSave, onDelete, logActivity }) {
   const [ed, setEd] = useState({ ...a });
   const [tab, setTab] = useState("info");
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState(a.notes || "");
+  const [newNote, setNewNote] = useState("");
 
   const save = async () => {
     setSaving(true);
@@ -1462,6 +1487,7 @@ function Panel({ a, onClose, onSave }) {
               {field("League","league")}
               {field("Status","status")}
               {field("Agency","agency")}
+              {field("Deal Value ($)","deal_value","number")}
             </>
           )}
           {tab==="contact" && (
@@ -1480,21 +1506,64 @@ function Panel({ a, onClose, onSave }) {
           )}
           {tab==="notes" && (
             <>
-              <label style={{ color:TX3, fontSize:11, fontWeight:600, letterSpacing:"0.06em", display:"block", marginBottom:8 }}>NOTES</label>
-              <textarea value={note} onChange={e=>setNote(e.target.value)}
-                rows={10} placeholder="Add notes about this athlete..."
-                style={{ background:C2, border:`1px solid ${BD}`, borderRadius:8, padding:12,
-                  color:TX1, fontSize:13, width:"100%", boxSizing:"border-box", resize:"vertical",
-                  outline:"none", fontFamily:"inherit", lineHeight:1.6 }}
-                onFocus={e=>e.target.style.borderColor=T+"66"}
-                onBlur={e=>e.target.style.borderColor=BD}
-              />
+              <label style={{ color:TX3, fontSize:11, fontWeight:600, letterSpacing:"0.06em", display:"block", marginBottom:8 }}>ADD NOTE</label>
+              <div style={{ display:"flex", gap:8, marginBottom:16 }}>
+                <input value={newNote} onChange={e=>setNewNote(e.target.value)}
+                  placeholder="Type a note and press Add..."
+                  onKeyDown={e=>{if(e.key==="Enter"&&newNote.trim()){
+                    const ts = new Date().toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+                    setNote(prev => `[${ts}] ${newNote.trim()}\n${prev}`);
+                    setNewNote("");
+                  }}}
+                  style={{ flex:1, background:C2, border:`1px solid ${BD}`, borderRadius:8, padding:"9px 12px",
+                    color:TX1, fontSize:13, outline:"none", fontFamily:"inherit" }}
+                  onFocus={e=>e.target.style.borderColor=T+"66"}
+                  onBlur={e=>e.target.style.borderColor=BD}
+                />
+                <Btn size="sm" onClick={()=>{
+                  if(!newNote.trim()) return;
+                  const ts = new Date().toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+                  setNote(prev => `[${ts}] ${newNote.trim()}\n${prev}`);
+                  setNewNote("");
+                }}>Add</Btn>
+              </div>
+              <label style={{ color:TX3, fontSize:11, fontWeight:600, letterSpacing:"0.06em", display:"block", marginBottom:8 }}>NOTES TIMELINE</label>
+              <div style={{ maxHeight:300, overflowY:"auto" }}>
+                {note.split("\n").filter(l=>l.trim()).map((line,i) => {
+                  const tsMatch = line.match(/^\[(.+?)\]\s*(.*)/);
+                  return (
+                    <div key={i} style={{ display:"flex", gap:10, padding:"8px 0",
+                      borderBottom: `1px solid ${BD}` }}>
+                      <div style={{ width:6, height:6, borderRadius:"50%", background:T, marginTop:7, flexShrink:0 }}/>
+                      <div style={{ flex:1 }}>
+                        {tsMatch ? (
+                          <>
+                            <div style={{ color:TX3, fontSize:10, fontWeight:600, marginBottom:2 }}>{tsMatch[1]}</div>
+                            <div style={{ color:TX1, fontSize:13 }}>{tsMatch[2]}</div>
+                          </>
+                        ) : (
+                          <div style={{ color:TX1, fontSize:13 }}>{line}</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {!note.trim() && <div style={{ color:TX3, fontSize:13, textAlign:"center", padding:20 }}>No notes yet</div>}
+              </div>
             </>
           )}
         </div>
 
         {/* Footer */}
         <div style={{ padding:"16px 28px", borderTop:`1px solid ${BD}`, display:"flex", gap:10 }}>
+          {onDelete && (
+            <Btn variant="danger" onClick={()=>onDelete(ed)} size="sm"
+              style={{ padding:"9px 14px" }} icon={
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                </svg>
+              }>Del</Btn>
+          )}
           <Btn onClick={onClose} variant="ghost" style={{flex:1, justifyContent:"center"}}>Cancel</Btn>
           <Btn onClick={save} style={{flex:2, justifyContent:"center"}} disabled={saving}>
             {saving ? "Saving..." : "Save Changes"}
@@ -1667,14 +1736,24 @@ function FollowUpRecommendations({ athletes, onSelect }) {
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 function Dashboard({ athletes, onSelect }) {
-  const total    = athletes.length;
-  const byStatus = useMemo(()=>STATUSES.reduce((a,s)=>({ ...a,[s]: athletes.filter(x=>x.status===s).length }),{}), [athletes]);
-  const byLeague = useMemo(()=>LEAGUES.map(l=>({ name:l, value:athletes.filter(x=>x.league===l).length, color:LCOLS[l] })).filter(x=>x.value), [athletes]);
+  const [dashLeague, setDashLeague] = useState("All");
+  const [dashStatus, setDashStatus] = useState("All");
+
+  const dashAthletes = useMemo(() => {
+    let r = athletes;
+    if (dashLeague !== "All") r = r.filter(a => a.league === dashLeague);
+    if (dashStatus !== "All") r = r.filter(a => a.status === dashStatus);
+    return r;
+  }, [athletes, dashLeague, dashStatus]);
+
+  const total    = dashAthletes.length;
+  const byStatus = useMemo(()=>STATUSES.reduce((a,s)=>({ ...a,[s]: dashAthletes.filter(x=>x.status===s).length }),{}), [dashAthletes]);
+  const byLeague = useMemo(()=>LEAGUES.map(l=>({ name:l, value:dashAthletes.filter(x=>x.league===l).length, color:LCOLS[l] })).filter(x=>x.value), [dashAthletes]);
 
   const topAgencies = useMemo(()=>{
-    const m={}; athletes.forEach(a=>{ if(a.agency) m[a.agency]=(m[a.agency]||0)+1; });
+    const m={}; dashAthletes.forEach(a=>{ if(a.agency) m[a.agency]=(m[a.agency]||0)+1; });
     return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([name,count])=>({name,count}));
-  },[athletes]);
+  },[dashAthletes]);
 
   const trend = useMemo(() => {
     const CAMPAIGN_DAYS = 24;
@@ -1711,7 +1790,18 @@ function Dashboard({ athletes, onSelect }) {
           Hello Team ATLAUA
         </h1>
         <p style={{ margin:"8px 0 0", color:TX2, fontSize:15 }}>Here's your pipeline overview for today · {new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</p>
-        <div style={{ marginTop:16, height:1, background:`linear-gradient(90deg, ${T}44, ${WINE}33, transparent)`, borderRadius:1 }}/>
+        <div style={{ marginTop:16, display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
+          <div style={{ color:TX3, fontSize:11, fontWeight:700, letterSpacing:"0.08em" }}>FILTER:</div>
+          <Select value={dashLeague} onChange={setDashLeague}
+            options={["All",...LEAGUES].map(l=>({value:l,label:l==="All"?"All Leagues":l}))}
+            style={{ background:C2+"88", fontSize:12, padding:"6px 12px" }}/>
+          <Select value={dashStatus} onChange={setDashStatus}
+            options={["All",...STATUSES].map(s=>({value:s,label:s==="All"?"All Statuses":s}))}
+            style={{ background:C2+"88", fontSize:12, padding:"6px 12px" }}/>
+          {(dashLeague!=="All" || dashStatus!=="All") && (
+            <Btn size="sm" variant="ghost" onClick={()=>{setDashLeague("All");setDashStatus("All");}}>Clear Filters</Btn>
+          )}
+        </div>
       </div>
 
       {/* KPIs */}
@@ -1729,7 +1819,7 @@ function Dashboard({ athletes, onSelect }) {
       </div>
 
       {/* Follow-up recommendations */}
-      <FollowUpRecommendations athletes={athletes} onSelect={onSelect} />
+      <FollowUpRecommendations athletes={dashAthletes} onSelect={onSelect} />
 
       {/* Charts row */}
       <div className="mobile-grid-1" style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:16, marginBottom:24 }}>
@@ -1820,13 +1910,14 @@ function Dashboard({ athletes, onSelect }) {
 }
 
 // ─── ATHLETES ────────────────────────────────────────────────────────────────
-function Athletes({ athletes, onSelect, onImport }) {
+function Athletes({ athletes, onSelect, onImport, bulkSelected, setBulkSelected, onBulkDelete, onBulkStatus, onDelete }) {
   const [q, setQ]           = useState("");
   const [league, setLeague] = useState("All");
   const [status, setStatus] = useState("All");
   const [sort, setSort]     = useState({ col:"athlete", dir:"asc" });
   const [page, setPage]     = useState(1);
   const [showImport, setShowImport] = useState(false);
+  const [bulkMode, setBulkMode] = useState(false);
   const PER = 25;
 
   const filtered = useMemo(()=>{
@@ -1866,10 +1957,32 @@ function Athletes({ athletes, onSelect, onImport }) {
     <div>
       <SectionHeader title="Athletes" sub={`${filtered.length} records`}
         right={<>
+          <Btn variant={bulkMode?"outline":"ghost"} size="sm" onClick={()=>{setBulkMode(b=>!b);setBulkSelected(new Set());}}
+            icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>}>
+            {bulkMode?"Exit Bulk":"Bulk"}
+          </Btn>
           <Btn variant="outline" size="sm" onClick={exportCSV} icon="↓">Export CSV</Btn>
           <Btn variant="ghost" size="sm" onClick={()=>setShowImport(true)} icon="↑">Import CSV</Btn>
         </>}
       />
+
+      {/* Bulk Actions Bar */}
+      {bulkMode && bulkSelected.size > 0 && (
+        <div style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 16px", marginBottom:16,
+          background:`linear-gradient(90deg, ${T}18, ${WINE}12)`, border:`1px solid ${T}44`,
+          borderRadius:12 }}>
+          <Tag label={`${bulkSelected.size} selected`} color={T}/>
+          <div style={{ display:"flex", gap:8, marginLeft:"auto" }}>
+            <Select value="" onChange={v=>{if(v) onBulkStatus(v);}}
+              options={[{value:"",label:"Change status..."}, ...STATUSES.map(s=>({value:s,label:s}))]}
+              style={{ fontSize:12 }}/>
+            <Btn size="sm" variant="danger" onClick={()=>{
+              if(window.confirm(`Delete ${bulkSelected.size} athletes? This cannot be undone.`)) onBulkDelete();
+            }}>Delete Selected</Btn>
+            <Btn size="sm" variant="ghost" onClick={()=>setBulkSelected(new Set())}>Clear</Btn>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div style={{ display:"flex", gap:10, marginBottom:20, flexWrap:"wrap" }}>
@@ -1886,6 +1999,19 @@ function Athletes({ athletes, onSelect, onImport }) {
           <table style={{ width:"100%", borderCollapse:"collapse" }}>
             <thead>
               <tr style={{ background:C2 }}>
+                {bulkMode && (
+                  <th style={{ padding:"10px 8px", borderBottom:`1px solid ${BD}`, width:36 }}>
+                    <div onClick={()=>{
+                      if(bulkSelected.size===paged.length) setBulkSelected(new Set());
+                      else setBulkSelected(new Set(filtered.map(a=>a.athlete)));
+                    }} style={{ width:18, height:18, borderRadius:4, border:`2px solid ${bulkSelected.size>0?T:TX3}`,
+                      background:bulkSelected.size===filtered.length?T:"transparent", display:"flex",
+                      alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
+                      {bulkSelected.size===filtered.length && <span style={{color:"#0A0613",fontSize:11,fontWeight:800}}>✓</span>}
+                      {bulkSelected.size>0 && bulkSelected.size<filtered.length && <span style={{color:T,fontSize:11,fontWeight:800}}>—</span>}
+                    </div>
+                  </th>
+                )}
                 <Th col="athlete" label="Athlete"/>
                 <Th col="team"    label="Team"/>
                 <Th col="league"  label="League"/>
@@ -1897,12 +2023,24 @@ function Athletes({ athletes, onSelect, onImport }) {
             </thead>
             <tbody>
               {paged.map((a,i)=>(
-                <tr key={i} onClick={()=>onSelect(a)} style={{
-                  background: i%2===0 ? "transparent" : C2+"88",
+                <tr key={i} onClick={()=>{ if(!bulkMode) onSelect(a); }} style={{
+                  background: bulkSelected.has(a.athlete) ? T+"14" : i%2===0 ? "transparent" : C2+"88",
                   cursor:"pointer", transition:"background 0.15s"
                 }}
-                onMouseEnter={e=>e.currentTarget.style.background=T+"12"}
-                onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"transparent":C2+"88"}>
+                onMouseEnter={e=>e.currentTarget.style.background=bulkSelected.has(a.athlete)?T+"22":T+"12"}
+                onMouseLeave={e=>e.currentTarget.style.background=bulkSelected.has(a.athlete)?T+"14":i%2===0?"transparent":C2+"88"}>
+                  {bulkMode && (
+                    <td style={{ padding:"12px 8px", width:36 }} onClick={e=>{
+                      e.stopPropagation();
+                      setBulkSelected(prev=>{const n=new Set(prev);n.has(a.athlete)?n.delete(a.athlete):n.add(a.athlete);return n;});
+                    }}>
+                      <div style={{ width:18, height:18, borderRadius:4, border:`2px solid ${bulkSelected.has(a.athlete)?T:TX3}`,
+                        background:bulkSelected.has(a.athlete)?T:"transparent", display:"flex",
+                        alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
+                        {bulkSelected.has(a.athlete) && <span style={{color:"#0A0613",fontSize:11,fontWeight:800}}>✓</span>}
+                      </div>
+                    </td>
+                  )}
                   <td style={{ padding:"12px 14px", color:TX1, fontSize:14, fontWeight:700, whiteSpace:"nowrap" }}>{a.athlete}</td>
                   <td style={{ padding:"12px 14px", color:TX2, fontSize:12 }}>{a.team}</td>
                   <td style={{ padding:"12px 14px" }}><LeaguePill league={a.league}/></td>
@@ -1910,9 +2048,14 @@ function Athletes({ athletes, onSelect, onImport }) {
                   <td style={{ padding:"12px 14px", color:TX2, fontSize:12 }}>{a.agent}</td>
                   <td style={{ padding:"12px 14px" }}><StatusPill status={a.status}/></td>
                   <td style={{ padding:"12px 14px" }}>
-                    <button onClick={e=>{e.stopPropagation();onSelect(a);}} style={{
-                      background:"none", border:`1px solid ${BD}`, color:TX2, borderRadius:6,
-                      padding:"4px 10px", fontSize:11, cursor:"pointer", fontFamily:"inherit" }}>Edit</button>
+                    <div style={{ display:"flex", gap:4 }}>
+                      <button onClick={e=>{e.stopPropagation();onSelect(a);}} style={{
+                        background:"none", border:`1px solid ${BD}`, color:TX2, borderRadius:6,
+                        padding:"4px 10px", fontSize:11, cursor:"pointer", fontFamily:"inherit" }}>Edit</button>
+                      {onDelete && <button onClick={e=>{e.stopPropagation();onDelete(a);}} style={{
+                        background:"none", border:`1px solid ${WINE}44`, color:WINE, borderRadius:6,
+                        padding:"4px 8px", fontSize:11, cursor:"pointer", fontFamily:"inherit" }}>✕</button>}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -2080,6 +2223,8 @@ function Teams({ athletes, onSelect }) {
 function Pipeline({ athletes, onUpdate, onSelect }) {
   const [dragging, setDragging] = useState(null);
   const [q, setQ] = useState("");
+  const [touchDragging, setTouchDragging] = useState(null);
+  const [mobileStatusPicker, setMobileStatusPicker] = useState(null);
 
   const cols = STATUSES.filter(s=>s!=="Pending");
   const cards = useMemo(()=>athletes.filter(a=>
@@ -2109,7 +2254,12 @@ function Pipeline({ athletes, onUpdate, onSelect }) {
               <div style={{ marginBottom:14 }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                   <div style={{ height:3, width:40, borderRadius:3, background:color, marginBottom:8 }}/>
-                  <Tag label={String(colCards.length)} color={color}/>
+                  <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                    <Tag label={String(colCards.length)} color={color}/>
+                    {colCards.some(a=>a.deal_value) && (
+                      <Tag label={`$${colCards.reduce((s,a)=>s+(Number(a.deal_value)||0),0).toLocaleString()}`} color={GREEN}/>
+                    )}
+                  </div>
                 </div>
                 <div style={{ color:TX1, fontSize:13, fontWeight:700 }}>{col}</div>
               </div>
@@ -2119,6 +2269,12 @@ function Pipeline({ athletes, onUpdate, onSelect }) {
                   onDragStart={()=>setDragging(a)}
                   onDragEnd={()=>setDragging(null)}
                   onClick={()=>onSelect(a)}
+                  onTouchEnd={e=>{
+                    if(typeof window!=="undefined"&&window.innerWidth<=768){
+                      e.preventDefault();
+                      setMobileStatusPicker(a);
+                    }
+                  }}
                   style={{ background:C2, border:`1px solid ${BD}`, borderRadius:10,
                     padding:"12px 14px", marginBottom:10, cursor:"grab",
                     boxShadow:"0 2px 8px rgba(0,0,0,0.3)", transition:"transform 0.15s, box-shadow 0.15s",
@@ -2127,8 +2283,9 @@ function Pipeline({ athletes, onUpdate, onSelect }) {
                   onMouseLeave={e=>{ e.currentTarget.style.transform="none"; e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,0.3)"; }}>
                   <div style={{ color:TX1, fontSize:13, fontWeight:700, marginBottom:4 }}>{a.athlete}</div>
                   <div style={{ color:TX2, fontSize:11, marginBottom:8 }}>{a.agency}</div>
-                  <div style={{ display:"flex", gap:6 }}>
+                  <div style={{ display:"flex", gap:6, alignItems:"center" }}>
                     <LeaguePill league={a.league}/>
+                    {a.deal_value && <Tag label={`$${Number(a.deal_value).toLocaleString()}`} color={GREEN}/>}
                   </div>
                 </div>
               ))}
@@ -2136,6 +2293,37 @@ function Pipeline({ athletes, onUpdate, onSelect }) {
           );
         })}
       </div>
+
+      {/* Mobile Status Picker */}
+      {mobileStatusPicker && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.7)", backdropFilter:"blur(6px)",
+          display:"flex", alignItems:"flex-end", justifyContent:"center", zIndex:1000 }}
+          onClick={()=>setMobileStatusPicker(null)}>
+          <div onClick={e=>e.stopPropagation()} style={{ background:C1, borderRadius:"20px 20px 0 0",
+            padding:"24px 20px", width:"100%", maxWidth:420, border:`1px solid ${BD2}`,
+            boxShadow:`0 -12px 48px rgba(0,0,0,0.5)` }}>
+            <div style={{ width:40, height:4, borderRadius:4, background:TX3, margin:"0 auto 16px" }}/>
+            <div style={{ color:TX1, fontSize:16, fontWeight:700, marginBottom:4 }}>{mobileStatusPicker.athlete}</div>
+            <div style={{ color:TX2, fontSize:12, marginBottom:16 }}>Move to stage:</div>
+            <div style={{ display:"grid", gap:8 }}>
+              {STATUSES.filter(s=>s!=="Pending"&&s!==mobileStatusPicker.status).map(s=>(
+                <button key={s} onClick={()=>{onUpdate({...mobileStatusPicker,status:s});setMobileStatusPicker(null);}}
+                  style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px",
+                    background:C2, border:`1px solid ${BD}`, borderRadius:12, cursor:"pointer",
+                    color:TX1, fontSize:14, fontWeight:600, fontFamily:"inherit", textAlign:"left" }}>
+                  <div style={{ width:10, height:10, borderRadius:"50%", background:SCOL[s]||T }}/>
+                  {s}
+                </button>
+              ))}
+            </div>
+            <button onClick={()=>{setMobileStatusPicker(null);onSelect(mobileStatusPicker);}}
+              style={{ width:"100%", marginTop:12, padding:"12px 0", background:T+"18", border:`1px solid ${T}44`,
+                borderRadius:12, color:T, fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>
+              View Details
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2422,7 +2610,7 @@ function Export({ athletes, contacts }) {
 }
 
 // ─── ACTIVITY / LOG ───────────────────────────────────────────────────────────
-function Activity({ athletes, onSelect }) {
+function Activity({ athletes, activityLog = [], onSelect }) {
   const statusToAction = {
     "Contacted": "Email sent to", "Negotiating": "Negotiation started with",
     "Proposal Sent": "Proposal sent to", "Closed Won": "Deal closed with",
@@ -2458,7 +2646,43 @@ function Activity({ athletes, onSelect }) {
 
   return (
     <div>
-      <SectionHeader title="Activity Log" sub={`${athletes.length} outreach actions over 24 days`}/>
+      <SectionHeader title="Activity Log" sub={`${activityLog.length} recent actions · ${athletes.length} outreach total`}/>
+
+      {/* Real-time CRM Activity */}
+      {activityLog.length > 0 && (
+        <Card glow style={{ marginBottom: 24, padding: 20 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+            <div style={{ width:32, height:32, borderRadius:10, background:GREEN+"22",
+              border:`1px solid ${GREEN}44`, display:"flex", alignItems:"center",
+              justifyContent:"center", color:GREEN }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+            </div>
+            <div>
+              <div style={{ color:TX1, fontSize:15, fontWeight:700 }}>Live CRM Activity</div>
+              <div style={{ color:TX2, fontSize:12 }}>Real-time actions from this session</div>
+            </div>
+          </div>
+          {activityLog.slice(0, 20).map(entry => (
+            <div key={entry.id} style={{ display:"flex", gap:12, alignItems:"center", padding:"8px 12px",
+              borderRadius:8, marginBottom:4, background:C2, border:`1px solid ${BD}` }}>
+              <div style={{ width:6, height:6, borderRadius:"50%", background:GREEN, flexShrink:0 }}/>
+              <div style={{ flex:1 }}>
+                <span style={{ color:TX2, fontSize:12 }}>{entry.action}</span>{" "}
+                <strong style={{ color:TX1, fontSize:13 }}>{entry.name}</strong>
+                {entry.details && <span style={{ color:TX3, fontSize:11 }}> · {entry.details}</span>}
+              </div>
+              <div style={{ color:TX3, fontSize:10, flexShrink:0 }}>
+                {new Date(entry.timestamp).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}
+              </div>
+            </div>
+          ))}
+        </Card>
+      )}
+
+      <div style={{ color:TX2, fontSize:14, fontWeight:600, marginBottom:12 }}>Outreach History</div>
       <SearchInput value={q} onChange={setQ} placeholder="Filter activity..." style={{ maxWidth: 340, marginBottom: 20 }}/>
 
       {grouped.map(group => {
@@ -2518,11 +2742,20 @@ export default function App() {
   const [globalQ, setGlobalQ] = useState("");
   const [mobileNav, setMobileNav] = useState(false);
   const [isMobile, setIsMobile] = useState(typeof window !== "undefined" && window.innerWidth <= 768);
+  const [activityLog, setActivityLog] = useState([]);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [bulkSelected, setBulkSelected] = useState(new Set());
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
+  }, []);
+
+  // ─── ACTIVITY LOGGING ────────────────────────────────────────────────────────
+  const logActivity = useCallback((action, name, details = "") => {
+    const entry = { id: Date.now() + Math.random(), action, name, details, timestamp: new Date().toISOString() };
+    setActivityLog(prev => [entry, ...prev].slice(0, 500));
   }, []);
 
   // Normalize Supabase row → local format (DB uses "name", app uses "athlete")
@@ -2564,16 +2797,31 @@ export default function App() {
       await supabase.from("athletes").update(dbRow).eq("name", dbRow.name);
     }
     setAthletes(prev=>prev.map(a=>(a.id && a.id===updated.id) || a.athlete===updated.athlete ? updated : a));
-  },[]);
+    logActivity("Updated athlete", updated.athlete, `Status: ${updated.status}`);
+  },[logActivity]);
 
   const addNew = useCallback(async (form, mode) => {
     if(mode==="athlete") {
+      // Duplicate detection
+      const name = (form.athlete || form.name || "").toLowerCase().trim();
+      const dup = athletes.find(a => (a.athlete||"").toLowerCase().trim() === name && name);
+      if (dup) {
+        const ok = window.confirm(`"${dup.athlete}" already exists (${dup.team}, ${dup.league}). Add anyway?`);
+        if (!ok) return;
+      }
       const dbRow = toDB(form);
       const { data } = await supabase.from("athletes").insert([dbRow]).select();
       if(data?.length) setAthletes(prev=>[fromDB(data[0]),...prev]);
       else setAthletes(prev=>[form,...prev]);
+      logActivity("Added athlete", form.athlete || form.name);
     } else {
-      // Contact: map form fields to Supabase columns
+      // Duplicate detection for contacts
+      const email = (form.email || "").toLowerCase().trim();
+      const dup = contacts.find(c => (c.email||"").toLowerCase().trim() === email && email);
+      if (dup) {
+        const ok = window.confirm(`Contact with email "${email}" already exists (${dup.name}). Add anyway?`);
+        if (!ok) return;
+      }
       const dbRow = {
         name: form.athlete || form.name || "",
         company: form.agency || form.company || "",
@@ -2584,34 +2832,54 @@ export default function App() {
       const { data } = await supabase.from("contacts").insert([dbRow]).select();
       if(data?.length) setContacts(prev=>[{ ...data[0], athlete: data[0].name },...prev]);
       else setContacts(prev=>[{ ...dbRow, athlete: dbRow.name },...prev]);
+      logActivity("Added contact", form.athlete || form.name);
     }
-  },[]);
+  },[athletes, contacts, logActivity]);
 
   const importBatch = useCallback(async (rows, mode) => {
     if(mode==="athletes") {
+      const existingNames = new Set(athletes.map(a => (a.athlete||"").toLowerCase().trim()));
       const mapped = rows.map(r=>({
         name:r.athlete||r.name||"",team:r.team||"",league:r.league||"",
         agency:r.agency||"",agent:r.agent||"",email:r.email||"",
         status:r.status||"Contacted",notes:r.notes||""
       })).filter(r=>r.name);
+      // Duplicate detection
+      const dupes = mapped.filter(r => existingNames.has(r.name.toLowerCase().trim()));
+      let toImport = mapped;
+      if (dupes.length > 0) {
+        const ok = window.confirm(`${dupes.length} of ${mapped.length} athletes already exist in the CRM. Import all anyway? (Cancel to skip duplicates)`);
+        if (!ok) toImport = mapped.filter(r => !existingNames.has(r.name.toLowerCase().trim()));
+      }
+      if (!toImport.length) return;
       const CHUNK=50;
-      for(let i=0;i<mapped.length;i+=CHUNK) {
-        const { data } = await supabase.from("athletes").insert(mapped.slice(i,i+CHUNK)).select();
+      for(let i=0;i<toImport.length;i+=CHUNK) {
+        const { data } = await supabase.from("athletes").insert(toImport.slice(i,i+CHUNK)).select();
         if(data) setAthletes(prev=>[...data.map(fromDB),...prev]);
       }
+      logActivity("Imported athletes", `${toImport.length} records`, `${dupes.length} duplicates skipped`);
     } else {
+      const existingEmails = new Set(contacts.map(c => (c.email||"").toLowerCase().trim()));
       const mapped = rows.map(r=>({
         name:r.name||r.athlete||"",company:r.company||r.agency||"",
         category:r.category||categorizeEmail(r.email||""),
         email:r.email||"",phone:r.phone||""
       })).filter(r=>r.name||r.email);
+      const dupes = mapped.filter(r => existingEmails.has((r.email||"").toLowerCase().trim()));
+      let toImport = mapped;
+      if (dupes.length > 0) {
+        const ok = window.confirm(`${dupes.length} of ${mapped.length} contacts already exist. Import all anyway?`);
+        if (!ok) toImport = mapped.filter(r => !existingEmails.has((r.email||"").toLowerCase().trim()));
+      }
+      if (!toImport.length) return;
       const CHUNK=50;
-      for(let i=0;i<mapped.length;i+=CHUNK) {
-        const { data } = await supabase.from("contacts").insert(mapped.slice(i,i+CHUNK)).select();
+      for(let i=0;i<toImport.length;i+=CHUNK) {
+        const { data } = await supabase.from("contacts").insert(toImport.slice(i,i+CHUNK)).select();
         if(data) setContacts(prev=>[...data.map(c=>({...c, athlete:c.name})),...prev]);
       }
+      logActivity("Imported contacts", `${toImport.length} records`);
     }
-  },[]);
+  },[athletes, contacts, logActivity]);
 
   const updContact = useCallback(async updated => {
     if (updated.id) {
@@ -2621,7 +2889,98 @@ export default function App() {
       }).eq("id", updated.id);
     }
     setContacts(prev=>prev.map(c=>c.id===updated.id ? { ...updated, athlete: updated.name } : c));
-  },[]);
+    logActivity("Updated contact", updated.name);
+  },[logActivity]);
+
+  // ─── DELETE FUNCTIONS ──────────────────────────────────────────────────────
+  const deleteAthlete = useCallback(async (athlete) => {
+    if (athlete.id) {
+      await supabase.from("athletes").delete().eq("id", athlete.id);
+    } else {
+      const dbName = athlete.athlete || athlete.name;
+      await supabase.from("athletes").delete().eq("name", dbName);
+    }
+    setAthletes(prev => prev.filter(a => a.athlete !== athlete.athlete));
+    logActivity("Deleted athlete", athlete.athlete);
+    setDeleteConfirm(null);
+    setSel(null);
+  }, [logActivity]);
+
+  const deleteContact = useCallback(async (contact) => {
+    if (contact.id) {
+      await supabase.from("contacts").delete().eq("id", contact.id);
+    }
+    setContacts(prev => prev.filter(c => c.id !== contact.id));
+    logActivity("Deleted contact", contact.name);
+    setDeleteConfirm(null);
+  }, [logActivity]);
+
+  const bulkDeleteAthletes = useCallback(async () => {
+    if (!bulkSelected.size) return;
+    const toDelete = athletes.filter(a => bulkSelected.has(a.athlete));
+    for (const a of toDelete) {
+      if (a.id) await supabase.from("athletes").delete().eq("id", a.id);
+      else await supabase.from("athletes").delete().eq("name", a.athlete || a.name);
+    }
+    setAthletes(prev => prev.filter(a => !bulkSelected.has(a.athlete)));
+    logActivity("Bulk deleted", `${toDelete.length} athletes`);
+    setBulkSelected(new Set());
+  }, [athletes, bulkSelected, logActivity]);
+
+  const bulkUpdateStatus = useCallback(async (newStatus) => {
+    if (!bulkSelected.size) return;
+    const toUpdate = athletes.filter(a => bulkSelected.has(a.athlete));
+    for (const a of toUpdate) {
+      const updated = { ...a, status: newStatus };
+      const dbRow = toDB(updated);
+      if (a.id) await supabase.from("athletes").update(dbRow).eq("id", a.id);
+      else await supabase.from("athletes").update(dbRow).eq("name", dbRow.name);
+    }
+    setAthletes(prev => prev.map(a => bulkSelected.has(a.athlete) ? { ...a, status: newStatus } : a));
+    logActivity("Bulk status update", `${toUpdate.length} athletes`, `Changed to ${newStatus}`);
+    setBulkSelected(new Set());
+  }, [athletes, bulkSelected, logActivity]);
+
+  // ─── GLOBAL SEARCH FILTERING ───────────────────────────────────────────────
+  const globalFiltered = useMemo(() => {
+    if (!globalQ.trim()) return { athletes, contacts };
+    const q = globalQ.toLowerCase();
+    return {
+      athletes: athletes.filter(a => Object.values(a).join(" ").toLowerCase().includes(q)),
+      contacts: contacts.filter(c => Object.values(c).join(" ").toLowerCase().includes(q))
+    };
+  }, [athletes, contacts, globalQ]);
+
+  // ─── SUPABASE REAL-TIME SUBSCRIPTIONS ──────────────────────────────────────
+  useEffect(() => {
+    const channel = supabase.channel("crm-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "athletes" }, (payload) => {
+        if (payload.eventType === "INSERT" && payload.new) {
+          setAthletes(prev => {
+            if (prev.some(a => a.id === payload.new.id)) return prev;
+            return [fromDB(payload.new), ...prev];
+          });
+        } else if (payload.eventType === "UPDATE" && payload.new) {
+          setAthletes(prev => prev.map(a => a.id === payload.new.id ? fromDB(payload.new) : a));
+        } else if (payload.eventType === "DELETE" && payload.old) {
+          setAthletes(prev => prev.filter(a => a.id !== payload.old.id));
+        }
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "contacts" }, (payload) => {
+        if (payload.eventType === "INSERT" && payload.new) {
+          setContacts(prev => {
+            if (prev.some(c => c.id === payload.new.id)) return prev;
+            return [{ ...payload.new, athlete: payload.new.name }, ...prev];
+          });
+        } else if (payload.eventType === "UPDATE" && payload.new) {
+          setContacts(prev => prev.map(c => c.id === payload.new.id ? { ...payload.new, athlete: payload.new.name } : c));
+        } else if (payload.eventType === "DELETE" && payload.old) {
+          setContacts(prev => prev.filter(c => c.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const navItems = [
     { id:"Dashboard", label:"Dashboard", icon:NavIcons.Dashboard },
@@ -2644,7 +3003,7 @@ export default function App() {
   );
 
   return (
-    <div style={{ display:"flex", height:"100vh", background:BG, color:TX1, fontFamily:"'Codec Pro','Questrial',system-ui,sans-serif", overflow:"hidden" }}>
+    <div style={{ display:"flex", height:"100vh", background:BG, color:TX1, fontFamily:"'Inter','Codec Pro',system-ui,-apple-system,sans-serif", overflow:"hidden" }}>
       {/* ── SIDEBAR (desktop) ── */}
       {!isMobile && (
         <aside style={{
@@ -2777,20 +3136,53 @@ export default function App() {
 
         {/* Content */}
         <main style={{ flex:1, overflowY:"auto", padding:isMobile?"16px 14px":"28px 32px" }}>
-          {page==="Dashboard" && <Dashboard athletes={athletes} onSelect={setSel}/>}
-          {page==="Athletes"  && <Athletes  athletes={athletes} onSelect={setSel} onImport={importBatch}/>}
-          {page==="Agencies"  && <Agencies  athletes={athletes} onSelect={setSel}/>}
-          {page==="Teams"     && <Teams     athletes={athletes} onSelect={setSel}/>}
-          {page==="Pipeline"  && <Pipeline  athletes={athletes} onUpdate={upd} onSelect={setSel}/>}
-          {page==="Contacts"  && <Contacts  contacts={contacts} onImport={importBatch} onUpdateContact={updContact}/>}
-          {page==="Activity"  && <Activity  athletes={athletes} onSelect={setSel}/>}
-          {page==="Export"    && <Export    athletes={athletes} contacts={contacts}/>}
+          {page==="Dashboard" && <Dashboard athletes={globalFiltered.athletes} onSelect={setSel}/>}
+          {page==="Athletes"  && <Athletes  athletes={globalFiltered.athletes} onSelect={setSel} onImport={importBatch}
+            bulkSelected={bulkSelected} setBulkSelected={setBulkSelected}
+            onBulkDelete={bulkDeleteAthletes} onBulkStatus={bulkUpdateStatus} onDelete={a=>setDeleteConfirm({type:"athlete",item:a})}/>}
+          {page==="Agencies"  && <Agencies  athletes={globalFiltered.athletes} onSelect={setSel}/>}
+          {page==="Teams"     && <Teams     athletes={globalFiltered.athletes} onSelect={setSel}/>}
+          {page==="Pipeline"  && <Pipeline  athletes={globalFiltered.athletes} onUpdate={upd} onSelect={setSel}/>}
+          {page==="Contacts"  && <Contacts  contacts={globalFiltered.contacts} onImport={importBatch} onUpdateContact={updContact}/>}
+          {page==="Activity"  && <Activity  athletes={athletes} activityLog={activityLog} onSelect={setSel}/>}
+          {page==="Export"    && <Export    athletes={globalFiltered.athletes} contacts={globalFiltered.contacts}/>}
         </main>
       </div>
 
       {/* Modals */}
-      {sel     && <Panel    a={sel} onClose={()=>setSel(null)} onSave={upd}/>}
+      {sel     && <Panel a={sel} onClose={()=>setSel(null)} onSave={upd}
+        onDelete={a=>setDeleteConfirm({type:"athlete",item:a})} logActivity={logActivity}/>}
       {showAdd && <AddModal onClose={()=>setShowAdd(false)} onAdd={addNew}/>}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.75)", backdropFilter:"blur(8px)",
+          display:"flex", alignItems:"center", justifyContent:"center", zIndex:1100 }}
+          onClick={e=>{ if(e.target===e.currentTarget) setDeleteConfirm(null); }}>
+          <div style={{ background:C1, border:`1px solid ${WINE}44`, borderRadius:16, padding:32,
+            width:"min(420px,90vw)", boxShadow:`0 24px 64px rgba(0,0,0,0.6), 0 0 40px ${WINE}18`, textAlign:"center" }}>
+            <div style={{ width:52, height:52, borderRadius:"50%", background:WINE+"22", border:`2px solid ${WINE}44`,
+              display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px" }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={WINE} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+              </svg>
+            </div>
+            <h3 style={{ margin:"0 0 8px", color:TX1, fontSize:18, fontWeight:700 }}>Delete {deleteConfirm.type}?</h3>
+            <p style={{ margin:"0 0 24px", color:TX2, fontSize:14 }}>
+              Are you sure you want to delete <strong style={{color:TX1}}>{deleteConfirm.item?.athlete || deleteConfirm.item?.name}</strong>?
+              This action cannot be undone.
+            </p>
+            <div style={{ display:"flex", gap:10 }}>
+              <Btn variant="ghost" onClick={()=>setDeleteConfirm(null)} style={{flex:1,justifyContent:"center"}}>Cancel</Btn>
+              <Btn variant="danger" onClick={()=>{
+                if(deleteConfirm.type==="athlete") deleteAthlete(deleteConfirm.item);
+                else deleteContact(deleteConfirm.item);
+              }} style={{flex:1,justifyContent:"center"}}>Delete</Btn>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
