@@ -671,6 +671,12 @@ const LEAGUES = ["NFL","NBA","NHL","MLB","UFC"];
 const STATUSES= ["Contacted","Negotiating","Proposal Sent","Closed Won","Closed Lost","Pending"];
 const ICONS   = {NFL:"",NBA:"",NHL:"",MLB:"",UFC:""};
 const TEAM_MEMBERS = ["Carlos","Maya","Adrian","Steven","Jaime","Felix"];
+const TEAM_EMAIL_MAP = {
+  "carlosromeu@atlaua.de":"Carlos",
+  "mayakoar@atlaua.de":"Maya",
+  "adriangoransch@atlaua.de":"Adrian"
+};
+const ALLOWED_EMAILS = Object.keys(TEAM_EMAIL_MAP);
 
 // ─── BRAND TOKENS (ATLAUA Brand Guidelines) ─────────────────────────────────
 const T     = "#04BDB7";   // Petrol – primary brand color
@@ -2804,7 +2810,149 @@ function Activity({ athletes, activityLog = [], onSelect }) {
 }
 
 // ─── APP SHELL ────────────────────────────────────────────────────────────────
+// ─── LOGIN SCREEN ───────────────────────────────────────────────────────────
+function LoginScreen({ onAuth }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [mode, setMode] = useState("signin"); // "signin" or "signup"
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    const em = email.toLowerCase().trim();
+    if (!ALLOWED_EMAILS.includes(em)) {
+      setError("Access denied. This email is not authorized.");
+      return;
+    }
+    setLoading(true);
+    try {
+      if (mode === "signup") {
+        const { error: signUpErr } = await supabase.auth.signUp({ email: em, password });
+        if (signUpErr) { setError(signUpErr.message); setLoading(false); return; }
+        setError("");
+        setMode("signin");
+        setLoading(false);
+        alert("Account created! Check your email to confirm, then sign in.");
+        return;
+      }
+      const { data, error: signInErr } = await supabase.auth.signInWithPassword({ email: em, password });
+      if (signInErr) { setError(signInErr.message); setLoading(false); return; }
+      if (data?.session) onAuth(data.session);
+    } catch { setError("Something went wrong. Try again."); }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ minHeight:"100vh", background:BG, display:"flex", alignItems:"center", justifyContent:"center",
+      fontFamily:"'Inter','Codec Pro',system-ui,-apple-system,sans-serif" }}>
+      {/* Background orbs */}
+      <div style={{ position:"fixed", inset:0, overflow:"hidden", pointerEvents:"none" }}>
+        <div style={{ position:"absolute", width:500, height:500, borderRadius:"50%",
+          background:`radial-gradient(circle, ${T}12, transparent 70%)`, top:"-10%", right:"-5%" }}/>
+        <div style={{ position:"absolute", width:400, height:400, borderRadius:"50%",
+          background:`radial-gradient(circle, ${WINE}10, transparent 70%)`, bottom:"-8%", left:"-5%" }}/>
+      </div>
+      <div style={{ position:"relative", zIndex:1, width:"min(420px, 90vw)" }}>
+        {/* Logo */}
+        <div style={{ textAlign:"center", marginBottom:36 }}>
+          <div style={{ filter:"drop-shadow(0 4px 24px rgba(4,189,183,0.3))", display:"inline-block" }}>
+            <AtlauaJaguarLogo size={72}/>
+          </div>
+          <div style={{ color:TX1, fontSize:22, fontWeight:800, letterSpacing:"0.04em", marginTop:16 }}>ATLAUA</div>
+          <div style={{ color:T, fontSize:10, letterSpacing:"0.2em", fontWeight:600, opacity:0.7 }}>SPORTS CRM</div>
+        </div>
+        {/* Card */}
+        <div style={{ background:C1, border:`1px solid ${BD2}`, borderRadius:20, padding:"36px 32px",
+          boxShadow:`0 24px 64px rgba(0,0,0,0.5), 0 0 40px ${T}08` }}>
+          <h2 style={{ margin:"0 0 6px", color:TX1, fontSize:20, fontWeight:800, textAlign:"center" }}>
+            {mode==="signin" ? "Welcome back" : "Create account"}
+          </h2>
+          <p style={{ margin:"0 0 28px", color:TX2, fontSize:13, textAlign:"center" }}>
+            {mode==="signin" ? "Sign in with your team email" : "Set up your team account"}
+          </p>
+          <form onSubmit={handleSubmit}>
+            <div style={{ marginBottom:16 }}>
+              <label style={{ color:TX3, fontSize:10, fontWeight:700, letterSpacing:"0.12em",
+                textTransform:"uppercase", display:"block", marginBottom:6 }}>EMAIL</label>
+              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} required
+                placeholder="you@atlaua.de"
+                style={{ width:"100%", boxSizing:"border-box", padding:"12px 16px", background:C2,
+                  border:`1px solid ${BD}`, borderRadius:10, color:TX1, fontSize:14, outline:"none",
+                  fontFamily:"inherit", transition:"border 0.2s" }}
+                onFocus={e=>{ e.target.style.borderColor=T+"88"; e.target.style.boxShadow=`0 0 0 3px ${T}18`; }}
+                onBlur={e=>{ e.target.style.borderColor=BD; e.target.style.boxShadow="none"; }}/>
+            </div>
+            <div style={{ marginBottom:24 }}>
+              <label style={{ color:TX3, fontSize:10, fontWeight:700, letterSpacing:"0.12em",
+                textTransform:"uppercase", display:"block", marginBottom:6 }}>PASSWORD</label>
+              <input type="password" value={password} onChange={e=>setPassword(e.target.value)} required
+                placeholder="••••••••" minLength={6}
+                style={{ width:"100%", boxSizing:"border-box", padding:"12px 16px", background:C2,
+                  border:`1px solid ${BD}`, borderRadius:10, color:TX1, fontSize:14, outline:"none",
+                  fontFamily:"inherit", transition:"border 0.2s" }}
+                onFocus={e=>{ e.target.style.borderColor=T+"88"; e.target.style.boxShadow=`0 0 0 3px ${T}18`; }}
+                onBlur={e=>{ e.target.style.borderColor=BD; e.target.style.boxShadow="none"; }}/>
+            </div>
+            {error && (
+              <div style={{ background:WINE+"22", border:`1px solid ${WINE}44`, borderRadius:10,
+                padding:"10px 14px", marginBottom:18, color:"#ff6b8a", fontSize:13, fontWeight:500 }}>
+                {error}
+              </div>
+            )}
+            <button type="submit" disabled={loading}
+              style={{ width:"100%", padding:"13px 0", borderRadius:12, border:"none", cursor:loading?"wait":"pointer",
+                background:`linear-gradient(135deg, ${T}, ${T}CC)`, color:"#0A0613", fontSize:15,
+                fontWeight:700, fontFamily:"inherit", letterSpacing:"0.02em",
+                boxShadow:`0 4px 24px ${T}44`, transition:"all 0.2s",
+                opacity:loading?0.6:1 }}>
+              {loading ? "..." : mode==="signin" ? "Sign In" : "Create Account"}
+            </button>
+          </form>
+          <div style={{ textAlign:"center", marginTop:20 }}>
+            <button onClick={()=>{ setMode(mode==="signin"?"signup":"signin"); setError(""); }}
+              style={{ background:"none", border:"none", color:T, fontSize:13, cursor:"pointer",
+                fontFamily:"inherit", fontWeight:500, opacity:0.8, transition:"opacity 0.2s" }}
+              onMouseEnter={e=>e.target.style.opacity=1} onMouseLeave={e=>e.target.style.opacity=0.8}>
+              {mode==="signin" ? "First time? Create account" : "Already have an account? Sign in"}
+            </button>
+          </div>
+        </div>
+        {/* Authorized emails hint */}
+        <div style={{ textAlign:"center", marginTop:20, color:TX3, fontSize:11 }}>
+          Only authorized team members can access this CRM
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
+  // ─── AUTH STATE ──────────────────────────────────────────────────────────────
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const currentUser = session?.user?.email ? (TEAM_EMAIL_MAP[session.user.email.toLowerCase()] || "Unknown") : "Unknown";
+  const currentEmail = session?.user?.email || "";
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      if (s && ALLOWED_EMAILS.includes(s.user?.email?.toLowerCase())) setSession(s);
+      setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_ev, s) => {
+      if (s && ALLOWED_EMAILS.includes(s.user?.email?.toLowerCase())) setSession(s);
+      else if (!s) setSession(null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const signOut = useCallback(async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+  }, []);
+
+  // ─── APP STATE ─────────────────────────────────────────────────────────────
   const [page, setPage]       = useState("Dashboard");
   const [athletes, setAthletes] = useState([]);
   const [contacts, setContacts] = useState([]);
@@ -3070,6 +3218,21 @@ export default function App() {
 
   const SB_W = sbCollapsed ? 68 : 220;
 
+  // Auth loading
+  if (authLoading) return (
+    <div style={{ height:"100vh", background:BG, display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column" }}>
+      <div style={{ filter:"drop-shadow(0 4px 24px rgba(4,189,183,0.25))", animation:"pulse-glow 2s ease infinite" }}>
+        <AtlauaJaguarLogo size={80}/>
+      </div>
+      <div style={{ color:TX1, fontSize:18, marginTop:24, letterSpacing:"0.08em", fontWeight:700 }}>ATLAUA</div>
+      <div style={{ color:TX3, fontSize:11, marginTop:6, letterSpacing:"0.15em" }}>LOADING...</div>
+    </div>
+  );
+
+  // Not authenticated → show login
+  if (!session) return <LoginScreen onAuth={setSession}/>;
+
+  // Data loading
   if (loading) return (
     <div style={{ height:"100vh", background:BG, display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column" }}>
       <div style={{ filter:"drop-shadow(0 4px 24px rgba(4,189,183,0.25))", animation:"pulse-glow 2s ease infinite" }}>
@@ -3135,8 +3298,35 @@ export default function App() {
             })}
           </nav>
 
+          {/* User + Sign out */}
+          <div style={{ padding:"10px 10px 6px", borderTop:`1px solid ${BD}` }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10, padding:sbCollapsed?"8px 0":"8px 10px",
+              justifyContent:sbCollapsed?"center":"flex-start" }}>
+              <div style={{ width:32, height:32, borderRadius:"50%", flexShrink:0,
+                background:`linear-gradient(135deg, ${T}44, ${WINE}44)`, border:`1.5px solid ${T}55`,
+                display:"flex", alignItems:"center", justifyContent:"center",
+                color:T, fontSize:12, fontWeight:800 }}>{currentUser[0]}</div>
+              {!sbCollapsed && (
+                <div style={{ overflow:"hidden", flex:1 }}>
+                  <div style={{ color:TX1, fontSize:12, fontWeight:700, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{currentUser}</div>
+                  <div style={{ color:TX3, fontSize:9, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{currentEmail}</div>
+                </div>
+              )}
+            </div>
+            <div onClick={signOut} title="Sign out"
+              style={{ display:"flex", alignItems:"center", justifyContent:sbCollapsed?"center":"flex-start",
+                gap:8, padding:"8px 14px", borderRadius:10, cursor:"pointer", color:TX3, marginTop:4,
+                transition:"all 0.18s" }}
+              onMouseEnter={e=>{ e.currentTarget.style.color="#ff6b8a"; e.currentTarget.style.background=C2; }}
+              onMouseLeave={e=>{ e.currentTarget.style.color=TX3; e.currentTarget.style.background="transparent"; }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+              {!sbCollapsed && <span style={{ fontSize:12 }}>Sign out</span>}
+            </div>
+          </div>
           {/* Collapse toggle */}
-          <div style={{ padding:"14px 10px", borderTop:`1px solid ${BD}` }}>
+          <div style={{ padding:"6px 10px 14px" }}>
             <div onClick={()=>setSbCollapsed(c=>!c)}
               style={{ display:"flex", alignItems:"center", justifyContent:sbCollapsed?"center":"flex-end",
                 gap:8, padding:"8px 14px", borderRadius:10, cursor:"pointer", color:TX3,
@@ -3186,6 +3376,27 @@ export default function App() {
                 );
               })}
             </nav>
+            {/* Mobile user + sign out */}
+            <div style={{ padding:"12px 14px", borderTop:`1px solid ${BD}` }}>
+              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
+                <div style={{ width:30, height:30, borderRadius:"50%", flexShrink:0,
+                  background:`linear-gradient(135deg, ${T}44, ${WINE}44)`, border:`1.5px solid ${T}55`,
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  color:T, fontSize:11, fontWeight:800 }}>{currentUser[0]}</div>
+                <div style={{ overflow:"hidden", flex:1 }}>
+                  <div style={{ color:TX1, fontSize:12, fontWeight:700 }}>{currentUser}</div>
+                  <div style={{ color:TX3, fontSize:9 }}>{currentEmail}</div>
+                </div>
+              </div>
+              <div onClick={()=>{signOut();setMobileNav(false);}}
+                style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 14px", borderRadius:10,
+                  cursor:"pointer", color:TX3, transition:"all 0.18s" }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+                <span style={{ fontSize:12 }}>Sign out</span>
+              </div>
+            </div>
           </div>
         </>
       )}
@@ -3222,7 +3433,7 @@ export default function App() {
               background:`linear-gradient(135deg, ${T}33, ${WINE}33)`,
               border:`1.5px solid ${T}55`, display:"flex", alignItems:"center", justifyContent:"center",
               color:T, fontSize:13, fontWeight:800, cursor:"pointer",
-              boxShadow:`0 0 12px ${T}15` }}>C</div>
+              boxShadow:`0 0 12px ${T}15` }}>{currentUser[0]}</div>
           </div>
         </header>
 
