@@ -2816,7 +2816,8 @@ function LoginScreen({ onAuth }) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [mode, setMode] = useState("signin"); // "signin" or "signup"
+  const [mode, setMode] = useState("signin"); // "signin" | "signup" | "reset"
+  const [resetSent, setResetSent] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -2828,6 +2829,15 @@ function LoginScreen({ onAuth }) {
     }
     setLoading(true);
     try {
+      if (mode === "reset") {
+        const { error: resetErr } = await supabase.auth.resetPasswordForEmail(em, {
+          redirectTo: window.location.origin
+        });
+        if (resetErr) { setError(resetErr.message); setLoading(false); return; }
+        setResetSent(true);
+        setLoading(false);
+        return;
+      }
       if (mode === "signup") {
         const { error: signUpErr } = await supabase.auth.signUp({ email: em, password });
         if (signUpErr) { setError(signUpErr.message); setLoading(false); return; }
@@ -2867,10 +2877,10 @@ function LoginScreen({ onAuth }) {
         <div style={{ background:C1, border:`1px solid ${BD2}`, borderRadius:20, padding:"36px 32px",
           boxShadow:`0 24px 64px rgba(0,0,0,0.5), 0 0 40px ${T}08` }}>
           <h2 style={{ margin:"0 0 6px", color:TX1, fontSize:20, fontWeight:800, textAlign:"center" }}>
-            {mode==="signin" ? "Welcome back" : "Create account"}
+            {mode==="reset" ? "Reset password" : mode==="signin" ? "Welcome back" : "Create account"}
           </h2>
           <p style={{ margin:"0 0 28px", color:TX2, fontSize:13, textAlign:"center" }}>
-            {mode==="signin" ? "Sign in with your team email" : "Set up your team account"}
+            {mode==="reset" ? "We'll send a reset link to your email" : mode==="signin" ? "Sign in with your team email" : "Set up your team account"}
           </p>
           <form onSubmit={handleSubmit}>
             <div style={{ marginBottom:16 }}>
@@ -2884,17 +2894,25 @@ function LoginScreen({ onAuth }) {
                 onFocus={e=>{ e.target.style.borderColor=T+"88"; e.target.style.boxShadow=`0 0 0 3px ${T}18`; }}
                 onBlur={e=>{ e.target.style.borderColor=BD; e.target.style.boxShadow="none"; }}/>
             </div>
-            <div style={{ marginBottom:24 }}>
-              <label style={{ color:TX3, fontSize:10, fontWeight:700, letterSpacing:"0.12em",
-                textTransform:"uppercase", display:"block", marginBottom:6 }}>PASSWORD</label>
-              <input type="password" value={password} onChange={e=>setPassword(e.target.value)} required
-                placeholder="••••••••" minLength={6}
-                style={{ width:"100%", boxSizing:"border-box", padding:"12px 16px", background:C2,
-                  border:`1px solid ${BD}`, borderRadius:10, color:TX1, fontSize:14, outline:"none",
-                  fontFamily:"inherit", transition:"border 0.2s" }}
-                onFocus={e=>{ e.target.style.borderColor=T+"88"; e.target.style.boxShadow=`0 0 0 3px ${T}18`; }}
-                onBlur={e=>{ e.target.style.borderColor=BD; e.target.style.boxShadow="none"; }}/>
-            </div>
+            {mode!=="reset" && (
+              <div style={{ marginBottom:24 }}>
+                <label style={{ color:TX3, fontSize:10, fontWeight:700, letterSpacing:"0.12em",
+                  textTransform:"uppercase", display:"block", marginBottom:6 }}>PASSWORD</label>
+                <input type="password" value={password} onChange={e=>setPassword(e.target.value)} required
+                  placeholder="••••••••" minLength={6}
+                  style={{ width:"100%", boxSizing:"border-box", padding:"12px 16px", background:C2,
+                    border:`1px solid ${BD}`, borderRadius:10, color:TX1, fontSize:14, outline:"none",
+                    fontFamily:"inherit", transition:"border 0.2s" }}
+                  onFocus={e=>{ e.target.style.borderColor=T+"88"; e.target.style.boxShadow=`0 0 0 3px ${T}18`; }}
+                  onBlur={e=>{ e.target.style.borderColor=BD; e.target.style.boxShadow="none"; }}/>
+              </div>
+            )}
+            {resetSent && mode==="reset" && (
+              <div style={{ background:T+"18", border:`1px solid ${T}44`, borderRadius:10,
+                padding:"12px 14px", marginBottom:18, color:T, fontSize:13, fontWeight:500, textAlign:"center" }}>
+                Reset link sent! Check your inbox.
+              </div>
+            )}
             {error && (
               <div style={{ background:WINE+"22", border:`1px solid ${WINE}44`, borderRadius:10,
                 padding:"10px 14px", marginBottom:18, color:"#ff6b8a", fontSize:13, fontWeight:500 }}>
@@ -2907,15 +2925,23 @@ function LoginScreen({ onAuth }) {
                 fontWeight:700, fontFamily:"inherit", letterSpacing:"0.02em",
                 boxShadow:`0 4px 24px ${T}44`, transition:"all 0.2s",
                 opacity:loading?0.6:1 }}>
-              {loading ? "..." : mode==="signin" ? "Sign In" : "Create Account"}
+              {loading ? "..." : mode==="reset" ? "Send Reset Link" : mode==="signin" ? "Sign In" : "Create Account"}
             </button>
           </form>
-          <div style={{ textAlign:"center", marginTop:20 }}>
-            <button onClick={()=>{ setMode(mode==="signin"?"signup":"signin"); setError(""); }}
+          <div style={{ textAlign:"center", marginTop:20, display:"flex", flexDirection:"column", gap:8, alignItems:"center" }}>
+            {mode==="signin" && (
+              <button onClick={()=>{ setMode("reset"); setError(""); setResetSent(false); }}
+                style={{ background:"none", border:"none", color:TX3, fontSize:12, cursor:"pointer",
+                  fontFamily:"inherit", fontWeight:500, opacity:0.8, transition:"opacity 0.2s" }}
+                onMouseEnter={e=>e.target.style.opacity=1} onMouseLeave={e=>e.target.style.opacity=0.8}>
+                Forgot password?
+              </button>
+            )}
+            <button onClick={()=>{ setMode(mode==="signin"?"signup":"signin"); setError(""); setResetSent(false); }}
               style={{ background:"none", border:"none", color:T, fontSize:13, cursor:"pointer",
                 fontFamily:"inherit", fontWeight:500, opacity:0.8, transition:"opacity 0.2s" }}
               onMouseEnter={e=>e.target.style.opacity=1} onMouseLeave={e=>e.target.style.opacity=0.8}>
-              {mode==="signin" ? "First time? Create account" : "Already have an account? Sign in"}
+              {mode==="reset" ? "Back to sign in" : mode==="signin" ? "First time? Create account" : "Already have an account? Sign in"}
             </button>
           </div>
         </div>
