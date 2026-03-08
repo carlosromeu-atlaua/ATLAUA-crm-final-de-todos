@@ -4,7 +4,9 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pi
 
 const SUPABASE_URL = "https://iwkfribpdpaeglaogxkx.supabase.co";
 const SUPABASE_KEY = "sb_publishable_3Jb6ozoasZI7Xa0In9SSEA_UZkq-IiS";
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+});
 
 
 const DATA = [
@@ -2839,8 +2841,19 @@ function LoginScreen({ onAuth }) {
         return;
       }
       if (mode === "signup") {
-        const { error: signUpErr } = await supabase.auth.signUp({ email: em, password });
-        if (signUpErr) { setError(signUpErr.message); setLoading(false); return; }
+        const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({ email: em, password });
+        if (signUpErr) {
+          const msg = signUpErr.message.toLowerCase();
+          setError(msg.includes("already") || msg.includes("exists") || msg.includes("registered")
+            ? "This email is already registered. Please sign in instead."
+            : signUpErr.message);
+          setLoading(false); return;
+        }
+        // Supabase returns a user with no identities if the email already exists (no error thrown)
+        if (signUpData?.user && signUpData.user.identities?.length === 0) {
+          setError("This email is already registered. Please sign in instead.");
+          setLoading(false); return;
+        }
         setError("");
         setMode("signin");
         setLoading(false);
