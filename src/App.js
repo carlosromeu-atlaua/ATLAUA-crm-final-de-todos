@@ -2833,7 +2833,12 @@ function LoginScreen({ onAuth }) {
         email: em,
         options: { emailRedirectTo: window.location.origin }
       });
-      if (otpErr) { setError(otpErr.message); setLoading(false); return; }
+      if (otpErr) {
+        const msg = otpErr.message.toLowerCase().includes("rate limit")
+          ? "Too many attempts. Please wait a minute and try again."
+          : otpErr.message;
+        setError(msg); setLoading(false); return;
+      }
       setLinkSent(true);
     } catch { setError("Something went wrong. Try again."); }
     setLoading(false);
