@@ -670,6 +670,7 @@ const TODAY   = new Date().toISOString().split("T")[0];
 const LEAGUES = ["NFL","NBA","NHL","MLB","UFC"];
 const STATUSES= ["Contacted","Negotiating","Proposal Sent","Closed Won","Closed Lost","Pending"];
 const ICONS   = {NFL:"",NBA:"",NHL:"",MLB:"",UFC:""};
+const TEAM_MEMBERS = ["Carlos","Maya","Adrian","Steven","Jaime","Felix"];
 
 // ─── BRAND TOKENS (ATLAUA Brand Guidelines) ─────────────────────────────────
 const T     = "#04BDB7";   // Petrol – primary brand color
@@ -702,6 +703,7 @@ const R_SM = 8, R_MD = 12, R_LG = 16, R_XL = 20, R_PILL = 100;
 const SCOL  = { Contacted:T, Negotiating:GOLD, "Proposal Sent":PURP, "Closed Won":GREEN, "Closed Lost":"#444", Pending:TX3 };
 const PCOLS = [T, WINE, GOLD, PURP, ROSE, GREEN];
 const LCOLS = { NFL:WINE, NBA:T, NHL:PURP, MLB:GREEN, UFC:GOLD };
+const MEMBER_COLORS = { Carlos:T, Maya:ROSE, Adrian:PURP, Steven:GOLD, Jaime:GREEN, Felix:"#FF6B35" };
 
 // ─── GOOGLE OAUTH ─────────────────────────────────────────────────────────────
 // IMPORTANT: Replace with your own Google OAuth client ID from console.cloud.google.com
@@ -1147,6 +1149,7 @@ function GmailConnectModal({ onClose, onImport }) {
   const [progress, setProgress] = useState(0);
   const [query, setQuery]   = useState("");
   const [filterCat, setFilterCat] = useState("All");
+  const [syncOwner, setSyncOwner] = useState("Carlos");
 
   const loadGSI = () => new Promise((res, rej) => {
     if (window.google?.accounts) { res(); return; }
@@ -1247,7 +1250,7 @@ function GmailConnectModal({ onClose, onImport }) {
   };
 
   const doImport = async () => {
-    const toImport = contacts.filter(c => selected.has(c.email));
+    const toImport = contacts.filter(c => selected.has(c.email)).map(c => ({ ...c, owner: syncOwner }));
     await onImport(toImport, "contacts");
     setStep(3);
   };
@@ -1314,9 +1317,24 @@ function GmailConnectModal({ onClose, onImport }) {
                 ))}
               </div>
             </Card>
+            <div style={{ marginBottom:16 }}>
+              <label style={{ color:TX3, fontSize:11, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", display:"block", marginBottom:8 }}>WHO IS SYNCING?</label>
+              <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                {TEAM_MEMBERS.map(m => (
+                  <button key={m} onClick={()=>setSyncOwner(m)}
+                    style={{ padding:"8px 18px", borderRadius:10, cursor:"pointer", fontWeight:600, fontSize:13,
+                      fontFamily:"inherit", transition:"all 0.18s",
+                      background: syncOwner===m ? (MEMBER_COLORS[m]||T)+"22" : C2,
+                      border: `1.5px solid ${syncOwner===m ? (MEMBER_COLORS[m]||T) : BD}`,
+                      color: syncOwner===m ? (MEMBER_COLORS[m]||T) : TX2 }}>
+                    {m}
+                  </button>
+                ))}
+              </div>
+            </div>
             <Btn onClick={connectGmail} variant="google" size="lg" style={{ width:"100%", justifyContent:"center" }}>
               <svg width="18" height="18" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-              Connect with Google
+              Connect as {syncOwner}
             </Btn>
           </div>
         )}
@@ -1778,18 +1796,24 @@ function Dashboard({ athletes, onSelect }) {
   return (
     <div>
       {/* Hero */}
-      <div style={{ background:`linear-gradient(135deg, ${C2} 0%, ${C1} 40%, ${T}12 80%, ${WINE}10 100%)`,
-        borderRadius:16, padding:"28px 32px", marginBottom:24, border:`1px solid ${BD2}`,
+      <div style={{ background:`linear-gradient(135deg, ${C2} 0%, ${C1} 30%, ${T}10 70%, ${WINE}08 100%)`,
+        borderRadius:20, padding:"32px 36px", marginBottom:28, border:`1px solid ${BD2}`,
         position:"relative", overflow:"hidden" }}>
-        <div style={{ position:"absolute", right:-30, top:-30, width:200, height:200,
-          borderRadius:"50%", background:T, opacity:0.04, pointerEvents:"none" }}/>
-        <div style={{ position:"absolute", right:60, bottom:-50, width:150, height:150,
-          borderRadius:"50%", background:WINE, opacity:0.06, pointerEvents:"none" }}/>
-        <div style={{ color:TX3, fontSize:12, fontWeight:700, letterSpacing:"0.1em", marginBottom:8 }}>ATLAUA SPORTS CRM</div>
-        <h1 style={{ margin:0, color:TX1, fontSize:32, fontWeight:800, letterSpacing:"-0.02em" }} className="mobile-text-sm">
+        <div style={{ position:"absolute", right:-40, top:-40, width:240, height:240,
+          borderRadius:"50%", background:`radial-gradient(circle, ${T}12, transparent 70%)`, pointerEvents:"none" }}/>
+        <div style={{ position:"absolute", right:80, bottom:-60, width:180, height:180,
+          borderRadius:"50%", background:`radial-gradient(circle, ${WINE}10, transparent 70%)`, pointerEvents:"none" }}/>
+        <div style={{ position:"absolute", left:-20, bottom:-30, width:120, height:120,
+          borderRadius:"50%", background:`radial-gradient(circle, ${GOLD}08, transparent 70%)`, pointerEvents:"none" }}/>
+        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
+          <div style={{ width:6, height:6, borderRadius:"50%", background:GREEN, boxShadow:`0 0 8px ${GREEN}66` }}/>
+          <div style={{ color:GREEN, fontSize:11, fontWeight:700, letterSpacing:"0.1em" }}>LIVE</div>
+          <div style={{ color:TX3, fontSize:11, letterSpacing:"0.06em" }}>ATLAUA SPORTS CRM</div>
+        </div>
+        <h1 style={{ margin:0, color:TX1, fontSize:34, fontWeight:800, letterSpacing:"-0.025em", lineHeight:1.1 }} className="mobile-text-sm">
           Hello Team ATLAUA
         </h1>
-        <p style={{ margin:"8px 0 0", color:TX2, fontSize:15 }}>Here's your pipeline overview for today · {new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</p>
+        <p style={{ margin:"10px 0 0", color:TX2, fontSize:14, lineHeight:1.5 }}>Pipeline overview · {new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"})}</p>
         <div style={{ marginTop:16, display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
           <div style={{ color:TX3, fontSize:11, fontWeight:700, letterSpacing:"0.08em" }}>FILTER:</div>
           <Select value={dashLeague} onChange={setDashLeague}
@@ -2373,6 +2397,14 @@ function ContactPanel({ contact, onClose, onSave }) {
           {field("Category","category")}
           {field("Email","email")}
           {field("Phone","phone")}
+          <div style={{ marginBottom:14 }}>
+            <label style={{ color:TX3, fontSize:11, fontWeight:600, letterSpacing:"0.06em", textTransform:"uppercase", display:"block", marginBottom:5 }}>ASSIGNED TO</label>
+            <select value={ed.owner||"Carlos"} onChange={e=>setEd(p=>({...p,owner:e.target.value}))}
+              style={{ background:C2, border:`1px solid ${BD}`, borderRadius:8, padding:"9px 12px",
+                color:TX1, fontSize:13, width:"100%", outline:"none", fontFamily:"inherit" }}>
+              {TEAM_MEMBERS.map(m=><option key={m}>{m}</option>)}
+            </select>
+          </div>
         </div>
         <div style={{ padding:"16px 24px", borderTop:`1px solid ${BD}`, display:"flex", gap:10 }}>
           <Btn onClick={onClose} variant="ghost" style={{flex:1,justifyContent:"center"}}>Cancel</Btn>
@@ -2390,13 +2422,22 @@ function Contacts({ contacts, onImport, onUpdateContact }) {
   const [showGmail, setShowGmail]     = useState(false);
   const [openCats, setOpenCats]       = useState(new Set(["Agency","Brand","Media","Team","Partner","Other"]));
   const [filterCat, setFilterCat]     = useState("All");
+  const [filterOwner, setFilterOwner] = useState("All");
   const [editContact, setEditContact] = useState(null);
 
   const cats = ["Agency","Brand","Media","Team","Partner","Distributor","Other"];
   const filtered = useMemo(()=>contacts.filter(c=>
     (filterCat==="All"||c.category===filterCat) &&
+    (filterOwner==="All"||(c.owner||"Carlos")===filterOwner) &&
     (!q || (c.name||"").toLowerCase().includes(q.toLowerCase()) || (c.email||"").toLowerCase().includes(q.toLowerCase()) || (c.company||"").toLowerCase().includes(q.toLowerCase()))
-  ),[contacts,q,filterCat]);
+  ),[contacts,q,filterCat,filterOwner]);
+
+  const ownerCounts = useMemo(() => {
+    const m = {};
+    TEAM_MEMBERS.forEach(n => { m[n] = 0; });
+    contacts.forEach(c => { const o = c.owner || "Carlos"; m[o] = (m[o]||0) + 1; });
+    return m;
+  }, [contacts]);
 
   const grouped = useMemo(()=>{
     const m={};
@@ -2413,21 +2454,47 @@ function Contacts({ contacts, onImport, onUpdateContact }) {
   return (
     <div>
       <SectionHeader title="Contacts"
-        sub={`${filtered.length} contacts`}
+        sub={`${filtered.length} contacts${filterOwner!=="All"?` assigned to ${filterOwner}`:""}`}
         right={<>
           <Btn size="sm" variant="ghost" onClick={()=>setShowImport(true)} icon="↑">Import CSV</Btn>
           <Btn size="sm" onClick={()=>setShowGmail(true)}
-            style={{ background:`linear-gradient(135deg,#4285F4,#34A853)`, color:"#fff", boxShadow:"0 4px 14px rgba(66,133,244,0.35)" }}>
+            style={{ background:`linear-gradient(135deg,#4285F4,#34A853)`, color:"#fff", boxShadow:"0 4px 14px rgba(66,133,244,0.25)", borderRadius:10 }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
               <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
               <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
             </svg>
-            Extract from Gmail
+            Sync Gmail
           </Btn>
         </>}
       />
+
+      {/* Team member tabs */}
+      <div style={{ display:"flex", gap:6, marginBottom:16, flexWrap:"wrap", padding:"4px 0" }}>
+        <button onClick={()=>setFilterOwner("All")}
+          style={{ padding:"7px 16px", borderRadius:10, cursor:"pointer", fontWeight:600, fontSize:12,
+            fontFamily:"inherit", transition:"all 0.18s", border:"none",
+            background: filterOwner==="All" ? T+"22" : "transparent",
+            color: filterOwner==="All" ? T : TX2,
+            boxShadow: filterOwner==="All" ? `0 0 0 1.5px ${T}` : "none" }}>
+          All ({contacts.length})
+        </button>
+        {TEAM_MEMBERS.map(m => {
+          const mc = MEMBER_COLORS[m] || T;
+          const active = filterOwner === m;
+          return (
+            <button key={m} onClick={()=>setFilterOwner(m)}
+              style={{ padding:"7px 16px", borderRadius:10, cursor:"pointer", fontWeight:600, fontSize:12,
+                fontFamily:"inherit", transition:"all 0.18s", border:"none",
+                background: active ? mc+"22" : "transparent",
+                color: active ? mc : TX2,
+                boxShadow: active ? `0 0 0 1.5px ${mc}` : "none" }}>
+              {m} ({ownerCounts[m]||0})
+            </button>
+          );
+        })}
+      </div>
 
       <div style={{ display:"flex", gap:10, marginBottom:20, flexWrap:"wrap" }}>
         <SearchInput value={q} onChange={setQ} placeholder="Search contacts..." style={{flex:1,minWidth:200}}/>
@@ -2454,7 +2521,7 @@ function Contacts({ contacts, onImport, onUpdateContact }) {
               <table style={{ width:"100%", borderCollapse:"collapse" }}>
                 <thead>
                   <tr style={{ background:C2+"88" }}>
-                    {["Name","Company / Email","Category","Actions"].map(h=>(
+                    {["Name","Company / Email","Owner","Category","Actions"].map(h=>(
                       <th key={h} style={{ padding:"9px 16px", color:TX3, fontSize:11, fontWeight:700,
                         letterSpacing:"0.07em", textTransform:"uppercase", textAlign:"left",
                         borderBottom:`1px solid ${BD}` }}>{h}</th>
@@ -2470,6 +2537,9 @@ function Contacts({ contacts, onImport, onUpdateContact }) {
                       <td style={{ padding:"11px 16px" }}>
                         <div style={{ color:TX2, fontSize:12 }}>{c.company||""}</div>
                         <span style={{ color:T, fontSize:11 }}>{c.email}</span>
+                      </td>
+                      <td style={{ padding:"11px 16px" }}>
+                        <Tag label={c.owner||"Carlos"} color={MEMBER_COLORS[c.owner||"Carlos"]||T}/>
                       </td>
                       <td style={{ padding:"11px 16px" }}>
                         <Tag label={c.category||"Other"} color={PCOLS[cats.indexOf(c.category||"Other")%PCOLS.length]}/>
@@ -2506,7 +2576,10 @@ function Contacts({ contacts, onImport, onUpdateContact }) {
       )}
 
       {showImport && <ImportCSVModal onClose={()=>setShowImport(false)} onImport={onImport} mode="contacts"/>}
-      {showGmail  && <GmailConnectModal onClose={()=>setShowGmail(false)} onImport={onImport}/>}
+      {showGmail  && <GmailConnectModal onClose={()=>setShowGmail(false)} onImport={(rows, mode) => {
+        const tagged = rows.map(r => ({ ...r, owner: r.owner || "Carlos" }));
+        onImport(tagged, mode);
+      }}/>}
       {editContact && <ContactPanel contact={editContact} onClose={()=>setEditContact(null)} onSave={onUpdateContact}/>}
     </div>
   );
@@ -2529,10 +2602,10 @@ function Export({ athletes, contacts }) {
   const doExport = () => {
     const headers = type==="athletes"
       ? ["Athlete","Team","League","Agency","Agent","Email","Status","Notes"]
-      : ["Name","Company","Category","Email","Source"];
+      : ["Name","Company","Category","Email","Owner","Source"];
     const rows = type==="athletes"
       ? data.map(a=>[a.athlete,a.team,a.league,a.agency,a.agent,a.email,a.status,a.notes||""])
-      : data.map(c=>[c.name,c.company||"",c.category||"",c.email||"",c.source||""]);
+      : data.map(c=>[c.name,c.company||"",c.category||"",c.email||"",c.owner||"Carlos",c.source||""]);
     const csv = [headers,...rows].map(r=>r.map(v=>`"${(v||"").replace(/"/g,'""')}"`).join(",")).join("\n");
     const a   = document.createElement("a");
     a.href    = "data:text/csv;charset=utf-8,\uFEFF"+encodeURIComponent(csv);
@@ -2779,7 +2852,7 @@ export default function App() {
           })));
         }
         const { data:con } = await supabase.from("contacts").select("*");
-        if(con) setContacts(con.map(c=>({ ...c, athlete: c.name || "" })));
+        if(con) setContacts(con.map(c=>({ ...c, athlete: c.name || "", owner: c.owner || "Carlos" })));
       } catch {
         setAthletes(DATA.map(r=>({
           athlete:r[0],team:r[1],league:r[2],agency:r[3],agent:r[4],email:r[5],status:r[6],notes:""
@@ -2827,10 +2900,11 @@ export default function App() {
         company: form.agency || form.company || "",
         category: form.category || categorizeEmail(form.email || ""),
         email: form.email || "",
-        phone: form.phone || ""
+        phone: form.phone || "",
+        owner: form.owner || "Carlos"
       };
       const { data } = await supabase.from("contacts").insert([dbRow]).select();
-      if(data?.length) setContacts(prev=>[{ ...data[0], athlete: data[0].name },...prev]);
+      if(data?.length) setContacts(prev=>[{ ...data[0], athlete: data[0].name, owner: data[0].owner || "Carlos" },...prev]);
       else setContacts(prev=>[{ ...dbRow, athlete: dbRow.name },...prev]);
       logActivity("Added contact", form.athlete || form.name);
     }
@@ -2863,7 +2937,8 @@ export default function App() {
       const mapped = rows.map(r=>({
         name:r.name||r.athlete||"",company:r.company||r.agency||"",
         category:r.category||categorizeEmail(r.email||""),
-        email:r.email||"",phone:r.phone||""
+        email:r.email||"",phone:r.phone||"",
+        owner:r.owner||"Carlos"
       })).filter(r=>r.name||r.email);
       const dupes = mapped.filter(r => existingEmails.has((r.email||"").toLowerCase().trim()));
       let toImport = mapped;
@@ -2885,7 +2960,7 @@ export default function App() {
     if (updated.id) {
       await supabase.from("contacts").update({
         name: updated.name, company: updated.company, category: updated.category,
-        email: updated.email, phone: updated.phone
+        email: updated.email, phone: updated.phone, owner: updated.owner || "Carlos"
       }).eq("id", updated.id);
     }
     setContacts(prev=>prev.map(c=>c.id===updated.id ? { ...updated, athlete: updated.name } : c));
@@ -2970,10 +3045,10 @@ export default function App() {
         if (payload.eventType === "INSERT" && payload.new) {
           setContacts(prev => {
             if (prev.some(c => c.id === payload.new.id)) return prev;
-            return [{ ...payload.new, athlete: payload.new.name }, ...prev];
+            return [{ ...payload.new, athlete: payload.new.name, owner: payload.new.owner || "Carlos" }, ...prev];
           });
         } else if (payload.eventType === "UPDATE" && payload.new) {
-          setContacts(prev => prev.map(c => c.id === payload.new.id ? { ...payload.new, athlete: payload.new.name } : c));
+          setContacts(prev => prev.map(c => c.id === payload.new.id ? { ...payload.new, athlete: payload.new.name, owner: payload.new.owner || "Carlos" } : c));
         } else if (payload.eventType === "DELETE" && payload.old) {
           setContacts(prev => prev.filter(c => c.id !== payload.old.id));
         }
@@ -2997,8 +3072,15 @@ export default function App() {
 
   if (loading) return (
     <div style={{ height:"100vh", background:BG, display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column" }}>
-      <AtlauaJaguarLogo size={72}/>
-      <div style={{ color:T, fontSize:14, marginTop:20, letterSpacing:"0.12em", fontWeight:600 }}>LOADING CRM...</div>
+      <div style={{ filter:"drop-shadow(0 4px 24px rgba(4,189,183,0.25))", animation:"pulse-glow 2s ease infinite" }}>
+        <AtlauaJaguarLogo size={80}/>
+      </div>
+      <div style={{ color:TX1, fontSize:18, marginTop:24, letterSpacing:"0.08em", fontWeight:700 }}>ATLAUA</div>
+      <div style={{ color:TX3, fontSize:11, marginTop:6, letterSpacing:"0.15em" }}>LOADING CRM...</div>
+      <div style={{ width:120, height:3, borderRadius:3, background:C3, marginTop:20, overflow:"hidden" }}>
+        <div style={{ height:"100%", width:"60%", borderRadius:3, background:`linear-gradient(90deg, transparent, ${T}, transparent)`,
+          animation:"shimmer 1.5s ease infinite" }}/>
+      </div>
     </div>
   );
 
@@ -3007,20 +3089,20 @@ export default function App() {
       {/* ── SIDEBAR (desktop) ── */}
       {!isMobile && (
         <aside style={{
-          width:SB_W, background:SB, display:"flex", flexDirection:"column",
-          borderRight:`1px solid ${BD}`, flexShrink:0, transition:"width 0.25s ease",
-          boxShadow:"4px 0 24px rgba(0,0,0,0.4)", position:"relative", zIndex:10, overflow:"hidden"
+          width:SB_W, background:`linear-gradient(180deg, ${SB} 0%, #040404 100%)`, display:"flex", flexDirection:"column",
+          borderRight:`1px solid ${BD}`, flexShrink:0, transition:"width 0.28s cubic-bezier(0.4,0,0.2,1)",
+          boxShadow:"4px 0 32px rgba(0,0,0,0.5)", position:"relative", zIndex:10, overflow:"hidden"
         }}>
           {/* Logo */}
-          <div style={{ padding:`24px ${sbCollapsed?14:20}px 20px`, borderBottom:`1px solid ${BD}`,
+          <div style={{ padding:`24px ${sbCollapsed?14:22}px 20px`, borderBottom:`1px solid ${BD}`,
             display:"flex", alignItems:"center", gap:12, overflow:"hidden" }}>
-            <div style={{ flexShrink:0 }}>
-              <AtlauaJaguarLogo size={40}/>
+            <div style={{ flexShrink:0, filter:"drop-shadow(0 2px 8px rgba(4,189,183,0.2))" }}>
+              <AtlauaJaguarLogo size={sbCollapsed ? 36 : 42}/>
             </div>
             {!sbCollapsed && (
               <div style={{ overflow:"hidden" }}>
-                <div style={{ color:TX1, fontSize:17, fontWeight:800, letterSpacing:"-0.01em", whiteSpace:"nowrap" }}>ATLAUA</div>
-                <div style={{ color:TX3, fontSize:10, letterSpacing:"0.15em", whiteSpace:"nowrap" }}>SPORTS CRM</div>
+                <div style={{ color:TX1, fontSize:18, fontWeight:800, letterSpacing:"0.04em", whiteSpace:"nowrap" }}>ATLAUA</div>
+                <div style={{ color:T, fontSize:9, letterSpacing:"0.2em", whiteSpace:"nowrap", fontWeight:600, opacity:0.7 }}>SPORTS CRM</div>
               </div>
             )}
           </div>
@@ -3111,8 +3193,9 @@ export default function App() {
       {/* ── MAIN ── */}
       <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
         {/* Top bar */}
-        <header style={{ height:isMobile?50:56, background:SB, borderBottom:`1px solid ${BD}`,
-          display:"flex", alignItems:"center", padding:isMobile?"0 14px":"0 28px", gap:isMobile?10:14, flexShrink:0, zIndex:9 }}>
+        <header style={{ height:isMobile?54:60, background:`linear-gradient(180deg, ${SB}, ${SB}F0)`, borderBottom:`1px solid ${BD}`,
+          display:"flex", alignItems:"center", padding:isMobile?"0 14px":"0 28px", gap:isMobile?10:14, flexShrink:0, zIndex:9,
+          backdropFilter:"blur(12px)" }}>
           {isMobile && (
             <button onClick={()=>setMobileNav(true)} style={{ background:"none", border:"none", color:TX1, cursor:"pointer", padding:4, display:"flex" }}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -3120,17 +3203,26 @@ export default function App() {
               </svg>
             </button>
           )}
-          <div style={{ color:TX2, fontSize:13, fontWeight:600 }}>{page}</div>
+          <div style={{ display:"flex", alignItems:"baseline", gap:8 }}>
+            <div style={{ color:TX1, fontSize:15, fontWeight:700, letterSpacing:"-0.01em" }}>{page}</div>
+            {!isMobile && <div style={{ color:TX3, fontSize:11 }}>{
+              page==="Athletes" ? `${athletes.length} athletes` :
+              page==="Contacts" ? `${contacts.length} contacts` :
+              page==="Pipeline" ? `${athletes.filter(a=>a.status==="Negotiating"||a.status==="Proposal Sent").length} active deals` : ""
+            }</div>}
+          </div>
           {!isMobile && (
-            <div style={{ flex:1, maxWidth:380, marginLeft:24 }}>
-              <SearchInput value={globalQ} onChange={setGlobalQ} placeholder="Global search..."/>
+            <div style={{ flex:1, maxWidth:400, marginLeft:24 }}>
+              <SearchInput value={globalQ} onChange={setGlobalQ} placeholder="Search athletes, contacts, agencies..."/>
             </div>
           )}
-          <div style={{ marginLeft:"auto", display:"flex", gap:isMobile?8:10, alignItems:"center" }}>
-            <Btn size="sm" onClick={()=>setShowAdd(true)} icon="+">{isMobile?"":"New"}</Btn>
-            <div style={{ width:32, height:32, borderRadius:"50%", background:T+"22",
-              border:`1px solid ${T}44`, display:"flex", alignItems:"center", justifyContent:"center",
-              color:T, fontSize:13, fontWeight:700, cursor:"pointer" }}>A</div>
+          <div style={{ marginLeft:"auto", display:"flex", gap:isMobile?8:12, alignItems:"center" }}>
+            <Btn size="sm" onClick={()=>setShowAdd(true)} icon="+">{isMobile?"":"New Record"}</Btn>
+            <div style={{ width:34, height:34, borderRadius:"50%",
+              background:`linear-gradient(135deg, ${T}33, ${WINE}33)`,
+              border:`1.5px solid ${T}55`, display:"flex", alignItems:"center", justifyContent:"center",
+              color:T, fontSize:13, fontWeight:800, cursor:"pointer",
+              boxShadow:`0 0 12px ${T}15` }}>C</div>
           </div>
         </header>
 
