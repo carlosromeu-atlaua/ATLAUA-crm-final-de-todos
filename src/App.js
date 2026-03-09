@@ -3306,15 +3306,11 @@ export default function App() {
 
   // ─── DELETE FUNCTIONS ──────────────────────────────────────────────────────
   const deleteAthlete = useCallback(async (athlete) => {
-    const { error } = athlete.id
-      ? await supabase.from("athletes").delete().eq("id", athlete.id)
-      : await supabase.from("athletes").delete().eq("name", athlete.athlete || athlete.name);
-    if (error) {
-      console.error("Failed to delete athlete:", error.message);
-      alert(`Failed to delete: ${error.message}`);
-      setDeleteConfirm(null);
-      return;
-    }
+    const { data, error } = athlete.id
+      ? await supabase.from("athletes").delete().eq("id", athlete.id).select()
+      : await supabase.from("athletes").delete().eq("name", athlete.athlete || athlete.name).select();
+    if (error) { alert(`Delete failed: ${error.message}`); setDeleteConfirm(null); return; }
+    if (!data || data.length === 0) { alert("Could not delete — check Supabase RLS policies. Run supabase-security.sql in your SQL Editor."); setDeleteConfirm(null); return; }
     setAthletes(prev => prev.filter(a => a.athlete !== athlete.athlete));
     logActivity("Deleted athlete", athlete.athlete);
     setDeleteConfirm(null);
@@ -3322,28 +3318,24 @@ export default function App() {
   }, [logActivity]);
 
   const deleteContact = useCallback(async (contact) => {
-    let deleted = false;
+    // Use .select() so we can verify rows were actually deleted (RLS can silently block)
     if (contact.id) {
-      const { error } = await supabase.from("contacts").delete().eq("id", contact.id);
-      if (error) {
-        console.error("Delete by id failed:", error.message);
-        // Fallback: try by email
+      const { data, error } = await supabase.from("contacts").delete().eq("id", contact.id).select();
+      if (error) { alert(`Delete failed: ${error.message}`); setDeleteConfirm(null); return; }
+      if (!data || data.length === 0) {
+        // RLS blocked or id mismatch — try by email
         if (contact.email) {
-          const { error: e2 } = await supabase.from("contacts").delete().eq("email", contact.email);
-          if (e2) { console.error("Delete by email also failed:", e2.message); alert(`Failed to delete: ${e2.message}`); setDeleteConfirm(null); return; }
-        } else { alert(`Failed to delete: ${error.message}`); setDeleteConfirm(null); return; }
+          const { data: d2, error: e2 } = await supabase.from("contacts").delete().eq("email", contact.email).select();
+          if (e2) { alert(`Delete failed: ${e2.message}`); setDeleteConfirm(null); return; }
+          if (!d2 || d2.length === 0) { alert("Could not delete — check Supabase RLS policies. Run the supabase-security.sql file in your SQL Editor."); setDeleteConfirm(null); return; }
+        } else { alert("Could not delete — check Supabase RLS policies."); setDeleteConfirm(null); return; }
       }
-      deleted = true;
     } else if (contact.email) {
-      const { error } = await supabase.from("contacts").delete().eq("email", contact.email);
-      if (error) { console.error("Delete by email failed:", error.message); alert(`Failed to delete: ${error.message}`); setDeleteConfirm(null); return; }
-      deleted = true;
+      const { data, error } = await supabase.from("contacts").delete().eq("email", contact.email).select();
+      if (error) { alert(`Delete failed: ${error.message}`); setDeleteConfirm(null); return; }
+      if (!data || data.length === 0) { alert("Could not delete — check Supabase RLS policies."); setDeleteConfirm(null); return; }
     }
-    if (deleted) {
-      setContacts(prev => prev.filter(c => c.id !== contact.id && c.email !== contact.email));
-    } else {
-      setContacts(prev => prev.filter(c => c.id !== contact.id));
-    }
+    setContacts(prev => prev.filter(c => c.id !== contact.id && c.email !== contact.email));
     logActivity("Deleted contact", contact.name);
     setDeleteConfirm(null);
   }, [logActivity]);
