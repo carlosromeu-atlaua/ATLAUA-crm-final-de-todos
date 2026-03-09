@@ -2977,24 +2977,29 @@ function LoginScreen({ onAuth }) {
           options: { data: { team_member: TEAM_EMAIL_MAP[em] || em } }
         });
         if (err) { setError(err.message); setLoading(false); return; }
-        // If session returned directly (email confirm disabled), use it
+        // If session returned directly (email confirm disabled in Supabase), use it
         if (signUpData?.session) { onAuth(signUpData.session); return; }
-        // Otherwise try to sign in immediately
-        const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({ email: em, password });
-        if (signInData?.session) { onAuth(signInData.session); return; }
-        if (signInErr?.message?.includes("Email not confirmed")) {
-          setError("Account created but email confirmation is required. Ask your admin to disable 'Confirm email' in Supabase → Authentication → Settings.");
-        } else if (signInErr) {
-          setError(signInErr.message);
-        } else {
-          setError("Account created! Try signing in now.");
+        // If user was created but needs confirmation — tell them what to do
+        if (signUpData?.user && !signUpData?.session) {
+          setError("Account created! But email confirmation is ON in Supabase. Go to Supabase Dashboard → Authentication → Providers → Email → turn OFF 'Confirm email' → Save. Then come back and Sign In.");
           setMode("signin");
+          setLoading(false);
+          return;
         }
+        setError("Account may already exist. Try signing in instead.");
+        setMode("signin");
         setLoading(false);
         return;
       }
       const { data, error: err } = await supabase.auth.signInWithPassword({ email: em, password });
-      if (err) { setError(err.message); setLoading(false); return; }
+      if (err) {
+        if (err.message.includes("Email not confirmed")) {
+          setError("Email not confirmed. Go to Supabase Dashboard → Authentication → Providers → Email → turn OFF 'Confirm email' → Save. Then try again.");
+        } else {
+          setError(err.message);
+        }
+        setLoading(false); return;
+      }
       if (data?.session) onAuth(data.session);
     } catch { setError("Something went wrong. Try again."); }
     setLoading(false);
