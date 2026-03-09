@@ -4,9 +4,9 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pi
 
 const SUPABASE_URL = "https://iwkfribpdpaeglaogxkx.supabase.co";
 const SUPABASE_KEY = "sb_publishable_3Jb6ozoasZI7Xa0In9SSEA_UZkq-IiS";
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+const supabase = window.__supabase || (window.__supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
-});
+}));
 
 
 const DATA = [
@@ -2520,18 +2520,25 @@ function Contacts({ contacts, onImport, onUpdateContact, onClearMember, onBulkCa
   const [bulkSelected, setBulkSelected] = useState(new Set());
 
   const cats = CONTACT_CATS;
-  const filtered = useMemo(()=>contacts.filter(c=>
+
+  // Ensure every contact has a valid category from CONTACT_CATS
+  const normalizedContacts = useMemo(() => contacts.map(c => {
+    if (c.category && CONTACT_CATS.includes(c.category)) return c;
+    return { ...c, category: categorizeEmail(c.email || "", c.name || "", c.company || "") };
+  }), [contacts]);
+
+  const filtered = useMemo(()=>normalizedContacts.filter(c=>
     (filterCat==="All"||c.category===filterCat) &&
     (filterOwner==="All"||(c.owner||"Carlos")===filterOwner) &&
     (!q || (c.name||"").toLowerCase().includes(q.toLowerCase()) || (c.email||"").toLowerCase().includes(q.toLowerCase()) || (c.company||"").toLowerCase().includes(q.toLowerCase()))
-  ),[contacts,q,filterCat,filterOwner]);
+  ),[normalizedContacts,q,filterCat,filterOwner]);
 
   const ownerCounts = useMemo(() => {
     const m = {};
     TEAM_MEMBERS.forEach(n => { m[n] = 0; });
-    contacts.forEach(c => { const o = c.owner || "Carlos"; m[o] = (m[o]||0) + 1; });
+    normalizedContacts.forEach(c => { const o = c.owner || "Carlos"; m[o] = (m[o]||0) + 1; });
     return m;
-  }, [contacts]);
+  }, [normalizedContacts]);
 
   const grouped = useMemo(()=>{
     const m={};
@@ -3158,7 +3165,31 @@ export default function App() {
           })));
         }
         const { data:con } = await supabase.from("contacts").select("*");
-        if(con) setContacts(con.map(c=>({ ...c, athlete: c.name || "", owner: c.owner || "Carlos" })));
+        if(con) {
+          const needsRecat = [];
+          const mapped = con.map(c => {
+            const current = c.category || "Other";
+            if (!CONTACT_CATS.includes(current)) {
+              const newCat = categorizeEmail(c.email || "", c.name || "", c.company || "");
+              needsRecat.push({ id: c.id, category: newCat });
+              return { ...c, athlete: c.name || "", owner: c.owner || "Carlos", category: newCat };
+            }
+            return { ...c, athlete: c.name || "", owner: c.owner || "Carlos" };
+          });
+          setContacts(mapped);
+          // Batch update re-categorized contacts in Supabase (fire and forget)
+          if (needsRecat.length > 0) {
+            (async () => {
+              for (let i = 0; i < needsRecat.length; i += 50) {
+                const batch = needsRecat.slice(i, i + 50);
+                await Promise.all(batch.map(({ id, category }) =>
+                  supabase.from("contacts").update({ category }).eq("id", id)
+                ));
+              }
+              console.log(`Re-categorized ${needsRecat.length} contacts`);
+            })();
+          }
+        }
       } catch {
         setAthletes(DATA.map(r=>({
           athlete:r[0],team:r[1],league:r[2],agency:r[3],agent:r[4],email:r[5],status:r[6],notes:""
@@ -3275,11 +3306,14 @@ export default function App() {
 
   // ─── DELETE FUNCTIONS ──────────────────────────────────────────────────────
   const deleteAthlete = useCallback(async (athlete) => {
-    if (athlete.id) {
-      await supabase.from("athletes").delete().eq("id", athlete.id);
-    } else {
-      const dbName = athlete.athlete || athlete.name;
-      await supabase.from("athletes").delete().eq("name", dbName);
+    const { error } = athlete.id
+      ? await supabase.from("athletes").delete().eq("id", athlete.id)
+      : await supabase.from("athletes").delete().eq("name", athlete.athlete || athlete.name);
+    if (error) {
+      console.error("Failed to delete athlete:", error.message);
+      alert(`Failed to delete: ${error.message}`);
+      setDeleteConfirm(null);
+      return;
     }
     setAthletes(prev => prev.filter(a => a.athlete !== athlete.athlete));
     logActivity("Deleted athlete", athlete.athlete);
@@ -3288,10 +3322,28 @@ export default function App() {
   }, [logActivity]);
 
   const deleteContact = useCallback(async (contact) => {
+    let deleted = false;
     if (contact.id) {
-      await supabase.from("contacts").delete().eq("id", contact.id);
+      const { error } = await supabase.from("contacts").delete().eq("id", contact.id);
+      if (error) {
+        console.error("Delete by id failed:", error.message);
+        // Fallback: try by email
+        if (contact.email) {
+          const { error: e2 } = await supabase.from("contacts").delete().eq("email", contact.email);
+          if (e2) { console.error("Delete by email also failed:", e2.message); alert(`Failed to delete: ${e2.message}`); setDeleteConfirm(null); return; }
+        } else { alert(`Failed to delete: ${error.message}`); setDeleteConfirm(null); return; }
+      }
+      deleted = true;
+    } else if (contact.email) {
+      const { error } = await supabase.from("contacts").delete().eq("email", contact.email);
+      if (error) { console.error("Delete by email failed:", error.message); alert(`Failed to delete: ${error.message}`); setDeleteConfirm(null); return; }
+      deleted = true;
     }
-    setContacts(prev => prev.filter(c => c.id !== contact.id));
+    if (deleted) {
+      setContacts(prev => prev.filter(c => c.id !== contact.id && c.email !== contact.email));
+    } else {
+      setContacts(prev => prev.filter(c => c.id !== contact.id));
+    }
     logActivity("Deleted contact", contact.name);
     setDeleteConfirm(null);
   }, [logActivity]);
@@ -3368,7 +3420,9 @@ export default function App() {
         if (payload.eventType === "INSERT" && payload.new) {
           setContacts(prev => {
             if (prev.some(c => c.id === payload.new.id)) return prev;
-            return [{ ...payload.new, athlete: payload.new.name, owner: payload.new.owner || "Carlos" }, ...prev];
+            const cat = CONTACT_CATS.includes(payload.new.category) ? payload.new.category
+              : categorizeEmail(payload.new.email||"", payload.new.name||"", payload.new.company||"");
+            return [{ ...payload.new, athlete: payload.new.name, owner: payload.new.owner || "Carlos", category: cat }, ...prev];
           });
         } else if (payload.eventType === "UPDATE" && payload.new) {
           setContacts(prev => prev.map(c => c.id === payload.new.id ? { ...payload.new, athlete: payload.new.name, owner: payload.new.owner || "Carlos" } : c));
