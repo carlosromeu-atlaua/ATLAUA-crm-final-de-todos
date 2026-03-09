@@ -3097,20 +3097,42 @@ function Activity({ athletes, activityLog = [], onSelect }) {
 
 // ─── APP SHELL ────────────────────────────────────────────────────────────────
 const QUICK_ACCESS_KEY = "atlaua_quick_access";
+const TEAM_PASSWORD = "AtlauaCRM2025!";
 
 // ─── LOGIN SCREEN ───────────────────────────────────────────────────────────
 function LoginScreen({ onAuth }) {
   const [loading, setLoading] = useState("");
   const [error, setError] = useState("");
 
-  const quickAccess = (em) => {
+  const quickAccess = async (em) => {
     setLoading(em);
     setError("");
-    // Store in localStorage for session persistence
     localStorage.setItem(QUICK_ACCESS_KEY, em);
-    const session = { user: { email: em }, quick_access: true };
-    // Small delay for visual feedback
-    setTimeout(() => onAuth(session), 300);
+    try {
+      // Try signing in with Supabase (real session = RLS works for delete/insert/update)
+      const { data, error: signInErr } = await supabase.auth.signInWithPassword({ email: em, password: TEAM_PASSWORD });
+      if (data?.session) {
+        onAuth(data.session);
+        return;
+      }
+      // If account doesn't exist, create it then sign in
+      if (signInErr) {
+        const { error: signUpErr } = await supabase.auth.signUp({
+          email: em, password: TEAM_PASSWORD,
+          options: { data: { team_member: TEAM_EMAIL_MAP[em] || em } }
+        });
+        if (!signUpErr) {
+          // Try sign in again after signup
+          const { data: d2 } = await supabase.auth.signInWithPassword({ email: em, password: TEAM_PASSWORD });
+          if (d2?.session) { onAuth(d2.session); return; }
+        }
+      }
+      // Fallback: use quick access session (reads work, writes may fail with RLS)
+      onAuth({ user: { email: em }, quick_access: true });
+    } catch {
+      // Network error etc — still let them in with quick access
+      onAuth({ user: { email: em }, quick_access: true });
+    }
   };
 
   return (
@@ -3203,16 +3225,23 @@ export default function App() {
   const currentEmail = session?.user?.email || "";
 
   useEffect(() => {
-    // 1. Check for quick access session first (localStorage)
     const quickEmail = localStorage.getItem(QUICK_ACCESS_KEY);
-    if (quickEmail && ALLOWED_EMAILS.includes(quickEmail.toLowerCase())) {
-      setSession({ user: { email: quickEmail.toLowerCase() }, quick_access: true });
-      setAuthLoading(false);
-      return;
-    }
-    // 2. Fallback to Supabase session
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      if (s && ALLOWED_EMAILS.includes(s.user?.email?.toLowerCase())) setSession(s);
+    // 1. Try to get existing Supabase session first
+    supabase.auth.getSession().then(async ({ data: { session: s } }) => {
+      if (s && ALLOWED_EMAILS.includes(s.user?.email?.toLowerCase())) {
+        setSession(s);
+        setAuthLoading(false);
+        return;
+      }
+      // 2. If we have a quick access email but no Supabase session, sign in to Supabase
+      if (quickEmail && ALLOWED_EMAILS.includes(quickEmail.toLowerCase())) {
+        try {
+          const { data } = await supabase.auth.signInWithPassword({ email: quickEmail.toLowerCase(), password: TEAM_PASSWORD });
+          if (data?.session) { setSession(data.session); setAuthLoading(false); return; }
+        } catch {}
+        // Fallback to quick access if Supabase sign-in fails
+        setSession({ user: { email: quickEmail.toLowerCase() }, quick_access: true });
+      }
       setAuthLoading(false);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_ev, s) => {
@@ -3263,6 +3292,8 @@ export default function App() {
     return { ...rest, name: athlete || row.name || "" };
   };
 
+  const contactsFixedRef = useRef(false);
+
   // Load from Supabase (only after auth is resolved)
   useEffect(()=>{
     if (authLoading) return;
@@ -3279,7 +3310,7 @@ export default function App() {
         }
         const { data:con } = await supabase.from("contacts").select("*");
         if(con) {
-          const needsUpdate = []; // contacts that need category or owner update in Supabase
+          const needsUpdate = [];
           const mapped = con.map(c => {
             const current = c.category || "Other";
             const ownerOk = !!c.owner;
@@ -3292,8 +3323,9 @@ export default function App() {
             return { ...c, athlete: c.name || "", owner: newOwner, category: newCat };
           });
           setContacts(mapped);
-          // Batch update contacts that need category or owner fix in Supabase (fire and forget)
-          if (needsUpdate.length > 0) {
+          // Batch update contacts that need category or owner fix in Supabase (once per session)
+          if (needsUpdate.length > 0 && !contactsFixedRef.current) {
+            contactsFixedRef.current = true;
             (async () => {
               for (let i = 0; i < needsUpdate.length; i += 50) {
                 const batch = needsUpdate.slice(i, i + 50);
