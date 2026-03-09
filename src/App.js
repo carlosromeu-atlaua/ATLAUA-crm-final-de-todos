@@ -1251,7 +1251,23 @@ function GmailConnectModal({ onClose, onImport, defaultOwner="Carlos" }) {
   const fetchContacts = async (accessToken) => {
     setProgress(5);
     try {
-      // 1. Fetch ALL sent message IDs with pagination
+      const contactMap = new Map();
+      const addContact = (name, email) => {
+        const em = email.toLowerCase().trim();
+        if (!em || !em.includes("@")) return;
+        // Skip own email and common no-reply addresses
+        if (/noreply|no-reply|mailer-daemon|notifications|alerts@|updates@|support@|info@|help@|admin@|billing@|newsletter|unsubscribe|do-not-reply|donotreply/.test(em)) return;
+        if (!contactMap.has(em)) {
+          contactMap.set(em, { name: name || em.split("@")[0], email: em,
+            category: categorizeEmail(em, name || "", ""), source:"Gmail Sync", count:1 });
+        } else {
+          const existing = contactMap.get(em);
+          existing.count++;
+          if (name && name.length > (existing.name||"").length && !name.includes("@")) existing.name = name;
+        }
+      };
+
+      // 1. Fetch SENT messages (people you contacted)
       let messages = [];
       let pageToken = null;
       let page = 0;
@@ -1263,44 +1279,54 @@ function GmailConnectModal({ onClose, onImport, defaultOwner="Carlos" }) {
         messages = messages.concat(listData.messages || []);
         pageToken = listData.nextPageToken || null;
         page++;
-        setProgress(Math.min(10, page * 3));
+        setProgress(Math.min(8, page * 2));
       } while (pageToken && messages.length < 5000);
-      setProgress(15);
 
-      // 2. Fetch headers in batches
-      const contactMap = new Map();
-      const batchSize  = 30;
-      const total = messages.length;
+      // 2. Fetch INBOX messages (people who contacted you)
+      let inboxMsgs = [];
+      pageToken = null;
+      page = 0;
+      do {
+        const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=500${pageToken ? `&pageToken=${pageToken}` : ""}`;
+        const listRes = await fetch(url, { headers:{ Authorization:`Bearer ${accessToken}` } });
+        if (!listRes.ok) break;
+        const listData = await listRes.json();
+        inboxMsgs = inboxMsgs.concat(listData.messages || []);
+        pageToken = listData.nextPageToken || null;
+        page++;
+        setProgress(Math.min(15, 8 + page * 2));
+      } while (pageToken && inboxMsgs.length < 3000);
+
+      // Combine and deduplicate message IDs
+      const allMsgIds = new Set();
+      const allMessages = [];
+      [...messages, ...inboxMsgs].forEach(m => {
+        if (!allMsgIds.has(m.id)) { allMsgIds.add(m.id); allMessages.push(m); }
+      });
+      setProgress(18);
+
+      // 3. Fetch headers in batches (From, To, Cc)
+      const batchSize = 40;
+      const total = allMessages.length;
       for (let i = 0; i < total; i += batchSize) {
-        const batch = messages.slice(i, i + batchSize);
+        const batch = allMessages.slice(i, i + batchSize);
         await Promise.all(batch.map(async msg => {
           try {
             const r = await fetch(
-              `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=To&metadataHeaders=Cc`,
+              `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc`,
               { headers:{ Authorization:`Bearer ${accessToken}` } }
             );
             if (!r.ok) return;
             const data = await r.json();
             const headers = data.payload?.headers || [];
-            ["To","Cc"].forEach(hName => {
+            ["From","To","Cc"].forEach(hName => {
               const h = headers.find(x=>x.name===hName);
               if (!h) return;
-              parseEmailAddresses(h.value).forEach(({name, email}) => {
-                if (!contactMap.has(email)) {
-                  contactMap.set(email, {
-                    name, email,
-                    category: categorizeEmail(email, name, ""),
-                    source:"Gmail History",
-                    count:1
-                  });
-                } else {
-                  contactMap.get(email).count++;
-                }
-              });
+              parseEmailAddresses(h.value).forEach(({name, email}) => addContact(name, email));
             });
           } catch(_) {}
         }));
-        setProgress(15 + Math.round((i/total)*80));
+        setProgress(18 + Math.round((i/total)*78));
       }
 
       const all = Array.from(contactMap.values()).sort((a,b)=>b.count-a.count);
@@ -2946,12 +2972,25 @@ function LoginScreen({ onAuth }) {
     setLoading(true);
     try {
       if (mode === "signup") {
-        const { error: err } = await supabase.auth.signUp({ email: em, password });
+        const { data: signUpData, error: err } = await supabase.auth.signUp({
+          email: em, password,
+          options: { data: { team_member: TEAM_EMAIL_MAP[em] || em } }
+        });
         if (err) { setError(err.message); setLoading(false); return; }
-        setError("");
-        setMode("signin");
+        // If session returned directly (email confirm disabled), use it
+        if (signUpData?.session) { onAuth(signUpData.session); return; }
+        // Otherwise try to sign in immediately
+        const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({ email: em, password });
+        if (signInData?.session) { onAuth(signInData.session); return; }
+        if (signInErr?.message?.includes("Email not confirmed")) {
+          setError("Account created but email confirmation is required. Ask your admin to disable 'Confirm email' in Supabase → Authentication → Settings.");
+        } else if (signInErr) {
+          setError(signInErr.message);
+        } else {
+          setError("Account created! Try signing in now.");
+          setMode("signin");
+        }
         setLoading(false);
-        alert("Account created! Check your email to confirm, then sign in.");
         return;
       }
       const { data, error: err } = await supabase.auth.signInWithPassword({ email: em, password });
