@@ -768,50 +768,70 @@ const CONTACT_CATS = [
 function categorizeEmail(email, name, company) {
   const domain = (email.split("@")[1] || "").toLowerCase();
   const text = `${domain} ${(name||"").toLowerCase()} ${(company||"").toLowerCase()}`;
-  const domBase = domain.split(".")[0] || "";
 
-  // ── FREE EMAIL → Other (personal emails, can't auto-categorize)
-  if (/gmail\.com|yahoo\.|hotmail\.|outlook\.|icloud\.|proton|aol\.|live\.com|msn\.com|me\.com|mail\.com|gmx\.|web\.de|t-online|freenet|posteo|ymail|rocketmail|zoho/.test(domain)) return "Other";
+  // ── FREE EMAIL → Other (personal emails, can't auto-categorize by domain)
+  if (/gmail\.com|yahoo\.|hotmail\.|outlook\.|icloud\.|proton|aol\.|live\.com|msn\.com|me\.com|mail\.com|gmx\.|web\.de|t-online|freenet|posteo|ymail|rocketmail|zoho|mailbox\.org|tutanota|fastmail/.test(domain)) {
+    // Even free emails might be classifiable by name/company info
+    if (company) {
+      const co = company.toLowerCase();
+      if (/sport|agent|athlet|talent|manage|represent/.test(co)) return "Athletes & Ambassadors";
+      if (/invest|capital|fund|venture|equity/.test(co)) return "Investors & Capital";
+      if (/media|press|news|journal|podcast/.test(co)) return "Media & Press";
+      if (/law|legal|consult|advisor|account/.test(co)) return "Advisors & Mentors";
+      if (/manufactur|produc|packag|factory|bottl/.test(co)) return "Manufacturing & Production";
+      if (/logistic|shipping|freight|warehouse/.test(co)) return "Logistics & Fulfillment";
+      if (/retail|distribut|store|shop|wholesale/.test(co)) return "Retail & Distribution";
+      if (/suppli|vendor|ingredient/.test(co)) return "Suppliers";
+    }
+    return "Other";
+  }
 
-  // ── INTERNAL NETWORK ── @atlaua.de, agencies, freelancers, service providers, consultants
+  // ── INTERNAL NETWORK ── only @atlaua.de domain
   if (domain.includes("atlaua")) return "Internal Network";
-  if (/agency|agentur|kreativ|werbeagentur|freelanc|fiverr|upwork|toptal|99design/.test(text)) return "Internal Network";
-  if (/wasserman|klutch|rosenhaus|wme|vayner|\bimg\b|boras|endeavor|sportstrust|steinberg|athletes.?first|octagon|creative.?artist|united.?talent|gpg|disruptive|paraphe|net.?sport|goal.?line|uasport|delta.?sport|intersport|global.?sport|hof.?player/.test(text)) return "Internal Network";
+
+  // ── ATHLETES & AMBASSADORS ── sports agencies, agents, athletes, talent management
+  // IMPORTANT: Sports agencies represent athletes → Athletes & Ambassadors (not Internal Network)
+  if (/wasserman|klutch|rosenhaus|wme|wmeagency|vayner|endeavor|sportstrust|steinberg|athletes.?first|octagon|creative.?artist|united.?talent|paraphe|net.?sport|goal.?line|uasport|delta.?sport|global.?sport|hof.?player|caa\.com|rocnation|roc.?nation|boras|excel.?sport|lbi\.?ent|dynasty.?sport|prather|milk.?honey|ripple.?sport|alliance.?sport|day1.?sport|just.?win|gseworldwide|qb.?reps|sport.?star|sport.?trust|aura.?s.*g|equity.?sport|prolifiq|range.?media|1up.?sport|barnburner|gen.?sport|net.?sports|upper.?edge|intersport|pyramid.?sport|cover.?0|maven.?sport|sun.?west|ses.?sport/.test(text)) return "Athletes & Ambassadors";
+  if (/athlete|player|ambassador|influencer|talent.?manage|champion|olymp|draft|prospect|fitness.?model|brand.?face|sportler|deportista|fitfluencer|sport.?manage|sport.?market|sport.?agent|sport.?group|sport.?advisory|sport.?consult/.test(text)) return "Athletes & Ambassadors";
+  if (/\bagent\b.*sport|\bsport.*agent|represent.*athlet|talent.*sport|nfl.*agent|nba.*agent|mlb.*agent|nhl.*agent/.test(text)) return "Athletes & Ambassadors";
 
   // ── INVESTORS & CAPITAL ── VCs, angels, family offices, banks, funds
-  if (/invest|venture|capital|\bfund|angel|\bvc\b|equity|holdings|fintech|private.?equity|seed\b|family.?office|portfolio|sequoia|andreessen|a16z|accel|greylock|kleiner|benchmark|tiger.?global|softbank|goldman|jpmorgan|morgan.?stanley|blackrock|citadel|bridgewater|kkr|carlyle|bain.?capital|ribbit|thrive|founders.?fund|khosla|lightspeed|general.?catalyst|index.?ventures|insight.?partner|bessemer|canaan|battery.?venture|spark.?capital|union.?square|first.?round|lerer|maveron|felicis|initialized|techstars|ycombinator|500.?startup|antler|plug.?and.?play/.test(text)) return "Investors & Capital";
+  if (/invest|venture|capital|\bfund\b|angel|\bvc\b|equity|holdings|fintech|private.?equity|seed\b|family.?office|portfolio|sequoia|andreessen|a16z|accel|greylock|kleiner|benchmark|tiger.?global|softbank|goldman|jpmorgan|morgan.?stanley|blackrock|citadel|bridgewater|kkr|carlyle|bain.?capital|ribbit|thrive|founders.?fund|khosla|lightspeed|general.?catalyst|index.?ventures|insight.?partner|bessemer|canaan|battery.?venture|spark.?capital|union.?square|first.?round|lerer|maveron|felicis|initialized|techstars|ycombinator|500.?startup|antler|plug.?and.?play|crowdfund|pitch.?deck|startup.?fund|growth.?equity|mezzanine|series.?[abc]/.test(text)) return "Investors & Capital";
+  if (/bank|financ|credit|lending|loan|mortgage|wealth.?manage|asset.?manage|hedge|securities/.test(text) && !/food.?bank|blood.?bank/.test(text)) return "Investors & Capital";
 
   // ── MEDIA & PRESS ── outlets, journalists, podcasts, content, PR
-  if (/espn|nbc|cbs|fox|bleacher|athletic|si\.com|reuters|bloomberg|forbes|cnbc|\bwsj\b|techcrunch|vox|vice|huffpost|buzzfeed|mashable|complex|highsnobiety|hypebeast|gq\b|esquire|mens.?health|womens.?health|runner|self\.com|shape\.com|outside\.com|wired|techradar|verge|engadget|ars.?technica|medium|substack/.test(text)) return "Media & Press";
-  if (/media|press|journal|times|news|broadcast|podcast|magazine|editorial|reporter|writer|blog|\btv\b|radio|streaming|content.?creator|influencer.?market|public.?relation|kommunikation|prensa|redacc|verlag|publish|bild|spiegel|stern|focus|suddeutsch|frankfurter|handelsblatt|tagesspiegel|dpa|efe|ansa|afp/.test(text)) return "Media & Press";
-
-  // ── ATHLETES & AMBASSADORS ── athletes, influencers, talent, sports figures
-  if (/athlete|player|ambassador|influencer|talent|champion|olymp|draft|prospect|fitness.?model|brand.?face|sportler|deportista|fitfluencer|trainer|coaching.?pro/.test(text)) return "Athletes & Ambassadors";
+  if (/espn|nbc|cbs|fox.?sport|bleacher|the.?athletic|si\.com|reuters|bloomberg|forbes|cnbc|\bwsj\b|techcrunch|vox\.com|vice\.com|huffpost|buzzfeed|mashable|complex\.com|highsnobiety|hypebeast|gq\.com|esquire|mens.?health|womens.?health|runners.?world|self\.com|shape\.com|outside\.com|wired|techradar|the.?verge|engadget|ars.?technica|medium\.com|substack|yahoo.?sport|sky.?sport|bein|dazn|barstool/.test(text)) return "Media & Press";
+  if (/media(?!.*(social|buy))|press|journal(?!.*account)|times(?!.*part)|news(?!.*letter)|broadcast|podcast|magazine|editorial|reporter|writer|blog(?!.*ger)|radio|streaming|content.?creat|public.?relation|kommunikation|prensa|redacc|verlag|publish|bild\b|spiegel|stern\.de|focus\.de|suddeutsch|frankfurter|handelsblatt|tagesspiegel|\bdpa\b|\befe\b|\bansa\b|\bafp\b|photographer|videograph|documental|filmmaker|cineast/.test(text)) return "Media & Press";
 
   // ── MANUFACTURING & PRODUCTION ── co-packers, bottling, labs, packaging, formulation
-  if (/manufactur|produc|factory|bottl|co.?pack|private.?label|formul|\blab\b|quality.?control|\bgmp\b|\bfda\b|packag|assembl|fabric|textile|garment|sew|embroid|screen.?print|prototype|drinkworks|beverage.?dev|flavor|recipe|batch|ferment|pasteur|aseptic|tetrapak|tetra.?pak|crown.?hold|ball.?corp|ardagh|amcor|rexam|silgan|berlin.?packag|closure.?system/.test(text)) return "Manufacturing & Production";
+  if (/manufactur|factory|bottl|co.?pack|private.?label|formul|\blab[s]?\b|quality.?control|\bgmp\b|\bfda\b|packag(?!.*design)|assembl|fabric(?!.*a\b)|textile|garment|sew(?!.*age)|embroid|screen.?print|prototype|drinkworks|beverage.?dev|flavor.?develop|recipe.?develop|batch.?produc|ferment|pasteur|aseptic|tetrapak|tetra.?pak|crown.?hold|ball.?corp|ardagh|amcor|rexam|silgan|berlin.?packag|closure.?system|injection.?mold|blow.?mold|extrusion|cnc.?machin|tooling/.test(text)) return "Manufacturing & Production";
+  if (/producci[oó]n|fabrica|herstellung|fertigung|produzent/.test(text)) return "Manufacturing & Production";
 
   // ── SUPPLIERS ── ingredients, bottles, labels, caps, raw materials
-  if (/suppli|vendor|procure|raw.?material|ingredient|electrolyte|\bcbd\b|functional.?ingredient|closure|flavor.?house|givaudan|firmenich|symrise|\bdsm\b|basf|cargill|\badm\b|tate.?lyle|sweetener|preserv|coloring|additive|nutraceutic|botanical|extract|organic.?sourc/.test(text)) return "Suppliers";
+  if (/suppli|vendor|procure|raw.?material|ingredient|electrolyte|\bcbd\b|functional.?ingredient|closure|flavor.?house|givaudan|firmenich|symrise|\bdsm\b|basf|cargill|\badm\b|tate.?lyle|sweetener|preserv|coloring|additive|nutraceutic|botanical|extract|organic.?sourc|proveedor|lieferant|zulieferer/.test(text)) return "Suppliers";
 
   // ── LOGISTICS & FULFILLMENT ── freight, warehousing, 3PL, cold chain, customs
-  if (/logistic|fulfil|shipping|freight|warehouse|delivery|courier|\bdhl\b|\bfedex\b|\bups\b|3pl|dispatch|transport|cargo|cold.?chain|import.?export|customs.?broker|maersk|kuehne|db.?schenk|xpo|flexport|shipbob|deliverr|amazon.?fba|hermes|gls|dpd|tnt\b|schenker/.test(text)) return "Logistics & Fulfillment";
+  if (/logistic|fulfil|shipping|freight|warehouse|delivery|courier|\bdhl\b|\bfedex\b|\bups\b|3pl|dispatch|transport|cargo|cold.?chain|import.?export|customs.?broker|maersk|kuehne|db.?schenk|xpo|flexport|shipbob|deliverr|amazon.?fba|hermes|gls\b|dpd\b|\btnt\b|schenker|spedition|envio|almacen/.test(text)) return "Logistics & Fulfillment";
 
   // ── RETAIL & DISTRIBUTION ── stores, gyms, hotels, bars, distributors, e-commerce
-  if (/retail|distribut|wholesale|ecommerce|marketplace|boutique|resell|stockist|fitness.?chain|health.?store|hotel|beach.?club|importer|whole.?foods|target|walmart|costco|kroger|trader.?joe|sprouts|publix|safeway|cvs|walgreen|rite.?aid|\bgym\b|\bgnc\b|vitamin.?shoppe|amazon|shopify|ebay|rewe|edeka|aldi|lidl|rossmann|dm\.de|mueller\.de|kaufland/.test(text)) return "Retail & Distribution";
+  if (/retail|distribut|wholesale|ecommerce|e.?commerce|marketplace|boutique|resell|stockist|fitness.?chain|health.?store|hotel|beach.?club|importer|whole.?foods|target\.com|walmart|costco|kroger|trader.?joe|sprouts|publix|safeway|cvs\b|walgreen|rite.?aid|\bgym[s]?\b|\bgnc\b|vitamin.?shoppe|amazon|shopify|ebay|rewe|edeka|aldi|lidl|rossmann|dm\.de|mueller\.de|kaufland|mercadona|carrefour|tesco|sainsbury|asda\.com|decathlon|intersport(?!.*manage)|sport.?direct|foot.?locker|dick.?sport|academy.?sport|rei\.com|lululemon.?store/.test(text)) return "Retail & Distribution";
+  if (/tienda|laden|gesch[aä]ft|einzelhandel|detallista|comercio/.test(text)) return "Retail & Distribution";
 
   // ── ADVISORS & MENTORS ── business, legal, regulatory, accounting
-  if (/advisor|consult|counsel|mentor|legal|\blaw\b|attorney|account|audit|regulat|\bcfo\b|\bcto\b|board\b|expert|steuerber|rechtsanw|abogad|kanzlei|notar|deloitte|pwc|kpmg|ernst.?young|\bey\b|mckinsey|\bbcg\b|baker.?mckenzie|latham|skadden|freshfields|clifford.?chance|hogan.?lovells|allen.?overy/.test(text)) return "Advisors & Mentors";
+  if (/advisor(?!.*sport)|consult(?!.*sport)|counsel|mentor|legal|\blaw\b|attorney|account(?!.*manager)|audit|regulat|\bcfo\b|\bcto\b|\bcoo\b|board.?member|expert|steuerber|rechtsanw|abogad|kanzlei|notar|deloitte|pwc|kpmg|ernst.?young|\bey\.com|mckinsey|\bbcg\b|baker.?mckenzie|latham|skadden|freshfields|clifford.?chance|hogan.?lovells|allen.?overy|estrateg|berater|asesora/.test(text)) return "Advisors & Mentors";
 
   // ── STRATEGIC PARTNERS ── leagues, sports orgs, wellness, tech, events, brands
-  if (/partner|collab|alliance|sponsor|foundation|\bngo\b|charity|assoc|federation|league|union|co.?brand|joint.?venture|baller.?league|converge|wellness|hospitality|festival/.test(text)) return "Strategic Partners";
-  if (/nfl\.com|nba\.com|nhl\.com|mlb\.com|mls|fifa|uefa|laliga|bundesliga|premierleague|seahawks|dolphins|lakers|celtics|yankees|cowboys|chiefs|bulls|heat|mavs|knicks|warriors|equinox|crossfit|soulcycle|peloton|orangetheory|barry.?boot|f45\b|anytime.?fitness/.test(text)) return "Strategic Partners";
+  if (/partner|collab|alliance|sponsor|foundation|\bngo\b|charity|assoc(?!.*iate)|federation|league(?!.*agent)|union|co.?brand|joint.?venture|baller.?league|converge|wellness|hospitality|festival/.test(text)) return "Strategic Partners";
+  if (/nfl\.com|nba\.com|nhl\.com|mlb\.com|mls(?:soccer)?|fifa|uefa|laliga|bundesliga|premierleague|seahawks|dolphins|lakers|celtics|yankees|cowboys|chiefs|bulls|heat|mavs|knicks|warriors|equinox|crossfit|soulcycle|peloton|orangetheory|barry.?boot|f45\b|anytime.?fitness/.test(text)) return "Strategic Partners";
   if (/nike|adidas|puma|under.?armour|new.?balance|reebok|asics|lululemon|gymshark|fabletics|alo.?yoga|vuori|on.?running|hoka|salomon|north.?face|patagonia|columbia|arcteryx|moncler/.test(text)) return "Strategic Partners";
-  if (/coca.?cola|pepsi|red.?bull|monster|gatorade|powerade|prime|celsius|bang|reign|bodyarmor|liquid.?death|hint|bai|vitaminwater|lacroix|topo.?chico|nescafe|starbucks|nestle|unilever|danone|keurig|dr.?pepper/.test(text)) return "Strategic Partners";
-  if (/google|apple|microsoft|meta|facebook|instagram|tiktok|snapchat|twitter|spotify|youtube|netflix|disney|warner|sony|samsung|huawei|xiaomi|tesla|uber|lyft|airbnb/.test(text)) return "Strategic Partners";
+  if (/coca.?cola|pepsi|red.?bull|monster|gatorade|powerade|prime.?hydrat|celsius|bang.?energy|reign|bodyarmor|liquid.?death|hint.?water|bai\b|vitaminwater|lacroix|topo.?chico|starbucks|nestle|unilever|danone|keurig|dr.?pepper/.test(text)) return "Strategic Partners";
+  if (/google|apple\.com|microsoft|meta\.com|facebook|instagram|tiktok|snapchat|twitter|spotify|youtube|netflix|disney|warner|sony|samsung|tesla|uber|lyft|airbnb/.test(text)) return "Strategic Partners";
+
+  // ── INTERNAL NETWORK ── freelancers, design agencies, dev agencies, service providers
+  if (/freelanc|fiverr|upwork|toptal|99design|design.?agency|web.?agency|dev.?agency|digital.?agency|kreativ|werbeagentur|agentur(?!.*sport)|marketing.?agency/.test(text)) return "Internal Network";
 
   // ── COMMUNITY & CLUB MEMBERS ── supporters, members, fans
-  if (/club|community|member|fan|supporter|youth|academy|grassroot|volunteer|founding|vip|elyte/.test(text)) return "Community & Club Members";
+  if (/club(?!.*sport.*manage)|community|member(?!.*ship.*fee)|fan\b|supporter|youth|academy(?!.*sport.*award)|grassroot|volunteer|founding|vip\b/.test(text)) return "Community & Club Members";
 
   // ── TLD-based heuristics for remaining business domains
   if (/\.edu$|\.ac\.|university|universit|hochschule|schule|college|school|campus/.test(domain)) return "Community & Club Members";
@@ -820,8 +840,6 @@ function categorizeEmail(email, name, company) {
   if (/\.store$|\.shop$/.test(domain)) return "Retail & Distribution";
 
   // ── Default: unknown business domains → Strategic Partners
-  // A real company domain that didn't match anything is most likely a business
-  // contact with partnership or collaboration potential
   return "Strategic Partners";
 }
 
@@ -1234,11 +1252,22 @@ function GmailConnectModal({ onClose, onImport, defaultOwner="Carlos" }) {
       }
       const tokenClient = window.google.accounts.oauth2.initTokenClient({
         client_id: GOOGLE_CLIENT_ID,
-        scope: "https://www.googleapis.com/auth/gmail.readonly",
+        scope: "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/contacts.readonly",
         callback: async (resp) => {
-          if (resp.error) { setError(`Auth error: ${resp.error}`); setStep(0); return; }
+          if (resp.error) {
+            const errMsg = resp.error === "access_denied"
+              ? "Access denied. Make sure you authorize ALL permissions. If using a Google Workspace account, your admin may need to allow this app."
+              : resp.error === "popup_closed_by_user"
+              ? "Sign-in popup was closed. Please try again."
+              : `Auth error: ${resp.error}${resp.error_description ? " — " + resp.error_description : ""}`;
+            setError(errMsg); setStep(0); return;
+          }
           setToken(resp.access_token);
           await fetchContacts(resp.access_token);
+        },
+        error_callback: (err) => {
+          setError(`Google Sign-In error: ${err.type || err.message || "Unknown error"}. Try refreshing the page.`);
+          setStep(0);
         }
       });
       tokenClient.requestAccessToken({ prompt:"consent" });
@@ -1251,50 +1280,90 @@ function GmailConnectModal({ onClose, onImport, defaultOwner="Carlos" }) {
   const fetchContacts = async (accessToken) => {
     setProgress(5);
     try {
+      // Get the user's own email to exclude it from contacts
+      let ownEmail = "";
+      try {
+        const profileRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", { headers: { Authorization: `Bearer ${accessToken}` } });
+        if (profileRes.ok) { const p = await profileRes.json(); ownEmail = (p.emailAddress || "").toLowerCase(); }
+      } catch(_) {}
+
       const contactMap = new Map();
       const addContact = (name, email) => {
         const em = email.toLowerCase().trim();
         if (!em || !em.includes("@")) return;
-        // Skip own email and common no-reply addresses
-        if (/noreply|no-reply|mailer-daemon|notifications|alerts@|updates@|support@|info@|help@|admin@|billing@|newsletter|unsubscribe|do-not-reply|donotreply/.test(em)) return;
+        // Skip own email, team emails, and common no-reply addresses
+        if (em === ownEmail) return;
+        if (/noreply|no-reply|no_reply|mailer-daemon|notifications@|alerts@|updates@|support@|info@|help@|admin@|billing@|newsletter|unsubscribe|do-not-reply|donotreply|feedback@|noreply|bounce|postmaster|webmaster|daemon|system@|automated|auto-reply|autoreply/.test(em)) return;
         if (!contactMap.has(em)) {
           contactMap.set(em, { name: name || em.split("@")[0], email: em,
-            category: categorizeEmail(em, name || "", ""), source:"Gmail Sync", count:1 });
+            category: categorizeEmail(em, name || "", ""), source: "Gmail Sync", count: 1 });
         } else {
           const existing = contactMap.get(em);
           existing.count++;
-          if (name && name.length > (existing.name||"").length && !name.includes("@")) existing.name = name;
+          if (name && name.length > (existing.name || "").length && !name.includes("@")) existing.name = name;
         }
       };
 
-      // 1. Fetch SENT messages (people you contacted)
+      // 1. Try Google People API first (gives higher quality contacts with company data)
+      let gotPeopleContacts = false;
+      try {
+        let peopleToken = null;
+        let peopleTotal = 0;
+        do {
+          const pUrl = `https://people.googleapis.com/v1/people/me/connections?personFields=names,emailAddresses,organizations&pageSize=1000${peopleToken ? `&pageToken=${peopleToken}` : ""}`;
+          const pRes = await fetch(pUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+          if (!pRes.ok) break;
+          const pData = await pRes.json();
+          (pData.connections || []).forEach(person => {
+            const emails = person.emailAddresses || [];
+            const pName = person.names?.[0]?.displayName || "";
+            const pCompany = person.organizations?.[0]?.name || "";
+            emails.forEach(e => {
+              const em = (e.value || "").toLowerCase().trim();
+              if (em && em.includes("@")) {
+                addContact(pName, em);
+                if (pCompany && contactMap.has(em)) contactMap.get(em).company = pCompany;
+              }
+            });
+          });
+          peopleToken = pData.nextPageToken || null;
+          peopleTotal += (pData.connections || []).length;
+          gotPeopleContacts = true;
+        } while (peopleToken);
+        if (gotPeopleContacts) setProgress(12);
+      } catch(_) { /* People API not available, continue with Gmail */ }
+
+      // 2. Fetch SENT messages (people you contacted)
       let messages = [];
       let pageToken = null;
       let page = 0;
       do {
         const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=SENT&maxResults=500${pageToken ? `&pageToken=${pageToken}` : ""}`;
-        const listRes = await fetch(url, { headers:{ Authorization:`Bearer ${accessToken}` } });
-        if (!listRes.ok) throw new Error(`Gmail API error: ${listRes.status}`);
+        const listRes = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+        if (!listRes.ok) {
+          const errBody = await listRes.json().catch(() => ({}));
+          throw new Error(`Gmail API error ${listRes.status}: ${errBody.error?.message || listRes.statusText}`);
+        }
         const listData = await listRes.json();
         messages = messages.concat(listData.messages || []);
         pageToken = listData.nextPageToken || null;
         page++;
-        setProgress(Math.min(8, page * 2));
+        setProgress(Math.min(gotPeopleContacts ? 20 : 10, (gotPeopleContacts ? 12 : 5) + page * 2));
       } while (pageToken && messages.length < 5000);
 
-      // 2. Fetch INBOX messages (people who contacted you)
+      // 3. Fetch INBOX messages (people who contacted you)
       let inboxMsgs = [];
       pageToken = null;
       page = 0;
       do {
         const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=500${pageToken ? `&pageToken=${pageToken}` : ""}`;
-        const listRes = await fetch(url, { headers:{ Authorization:`Bearer ${accessToken}` } });
+        const listRes = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
         if (!listRes.ok) break;
         const listData = await listRes.json();
         inboxMsgs = inboxMsgs.concat(listData.messages || []);
         pageToken = listData.nextPageToken || null;
         page++;
-        setProgress(Math.min(15, 8 + page * 2));
+        setProgress(Math.min(28, 20 + page * 2));
       } while (pageToken && inboxMsgs.length < 3000);
 
       // Combine and deduplicate message IDs
@@ -1303,9 +1372,9 @@ function GmailConnectModal({ onClose, onImport, defaultOwner="Carlos" }) {
       [...messages, ...inboxMsgs].forEach(m => {
         if (!allMsgIds.has(m.id)) { allMsgIds.add(m.id); allMessages.push(m); }
       });
-      setProgress(18);
+      setProgress(30);
 
-      // 3. Fetch headers in batches (From, To, Cc)
+      // 4. Fetch headers in batches (From, To, Cc)
       const batchSize = 40;
       const total = allMessages.length;
       for (let i = 0; i < total; i += batchSize) {
@@ -1314,36 +1383,103 @@ function GmailConnectModal({ onClose, onImport, defaultOwner="Carlos" }) {
           try {
             const r = await fetch(
               `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc`,
-              { headers:{ Authorization:`Bearer ${accessToken}` } }
+              { headers: { Authorization: `Bearer ${accessToken}` } }
             );
             if (!r.ok) return;
             const data = await r.json();
             const headers = data.payload?.headers || [];
-            ["From","To","Cc"].forEach(hName => {
-              const h = headers.find(x=>x.name===hName);
+            ["From", "To", "Cc"].forEach(hName => {
+              const h = headers.find(x => x.name === hName);
               if (!h) return;
-              parseEmailAddresses(h.value).forEach(({name, email}) => addContact(name, email));
+              parseEmailAddresses(h.value).forEach(({ name, email }) => addContact(name, email));
             });
           } catch(_) {}
         }));
-        setProgress(18 + Math.round((i/total)*78));
+        setProgress(30 + Math.round((i / total) * 65));
       }
 
-      const all = Array.from(contactMap.values()).sort((a,b)=>b.count-a.count);
+      const all = Array.from(contactMap.values()).sort((a, b) => b.count - a.count);
+      if (all.length === 0) {
+        setError("No contacts found in your Gmail. Make sure you have sent or received emails from this account.");
+        setStep(0);
+        return;
+      }
       setContacts(all);
-      setSelected(new Set(all.map(c=>c.email)));
+      setSelected(new Set(all.map(c => c.email)));
       setProgress(100);
       setStep(2);
     } catch(e) {
-      setError(`Error fetching Gmail: ${e.message}`);
+      const msg = e.message || "Unknown error";
+      if (msg.includes("403")) {
+        setError("Gmail API access denied (403). Make sure Gmail API is enabled in Google Cloud Console → APIs & Services → Enable APIs. Also ensure your Google account has Gmail access.");
+      } else if (msg.includes("401")) {
+        setError("Authentication expired. Please close this dialog and try again.");
+      } else if (msg.includes("429")) {
+        setError("Too many requests to Gmail API. Please wait a minute and try again.");
+      } else {
+        setError(`Error fetching Gmail: ${msg}`);
+      }
       setStep(0);
     }
   };
 
   const doImport = async () => {
-    const toImport = contacts.filter(c => selected.has(c.email)).map(c => ({ ...c, owner: syncOwner }));
-    await onImport(toImport, "contacts");
-    setStep(3);
+    setError("");
+    try {
+      const toImport = contacts.filter(c => selected.has(c.email)).map(c => ({ ...c, owner: syncOwner }));
+      if (!toImport.length) { setError("No contacts selected to import"); return; }
+      setStep(1); setProgress(0);
+      // Import directly to Supabase in batches, bypassing the parent importBatch
+      const existingEmails = new Set();
+      const { data: existingCon } = await supabase.from("contacts").select("email");
+      if (existingCon) existingCon.forEach(c => { if (c.email) existingEmails.add(c.email.toLowerCase().trim()); });
+      setProgress(10);
+      const mapped = toImport.map(r => ({
+        name: r.name || r.athlete || "",
+        company: r.company || r.agency || "",
+        category: r.category || categorizeEmail(r.email || "", r.name || "", r.company || ""),
+        email: r.email || "",
+        phone: r.phone || "",
+        owner: r.owner || syncOwner
+      })).filter(r => (r.name || r.email) && !existingEmails.has((r.email || "").toLowerCase().trim()));
+      if (!mapped.length) { setStep(3); return; } // all dupes, still show success
+      const CHUNK = 50;
+      let imported = 0;
+      for (let i = 0; i < mapped.length; i += CHUNK) {
+        const chunk = mapped.slice(i, i + CHUNK);
+        const { data, error: insertErr } = await supabase.from("contacts").insert(chunk).select();
+        if (insertErr) {
+          console.error("Insert error:", insertErr.message);
+          // Try inserting one by one as fallback
+          for (const row of chunk) {
+            const { data: single, error: singleErr } = await supabase.from("contacts").insert([row]).select();
+            if (single?.length) {
+              onImport([{ ...single[0], athlete: single[0].name }], "noop"); // just to update state
+              imported++;
+            } else if (singleErr) {
+              console.warn("Skipped:", row.email, singleErr.message);
+            }
+          }
+        } else if (data) {
+          imported += data.length;
+        }
+        setProgress(10 + Math.round(((i + CHUNK) / mapped.length) * 85));
+      }
+      // Refresh contacts from Supabase to ensure state is accurate
+      const { data: freshCon } = await supabase.from("contacts").select("*");
+      if (freshCon) {
+        const refreshed = freshCon.map(c => ({
+          ...c, athlete: c.name || "", owner: c.owner || syncOwner,
+          category: CONTACT_CATS.includes(c.category) ? c.category : categorizeEmail(c.email || "", c.name || "", c.company || "")
+        }));
+        onImport(refreshed, "refresh"); // special mode to replace all contacts
+      }
+      setProgress(100);
+      setStep(3);
+    } catch (e) {
+      setError(`Import failed: ${e.message}. Please try again.`);
+      setStep(2);
+    }
   };
 
   const cats = ["All", ...new Set(contacts.map(c=>c.category))];
@@ -2960,56 +3096,21 @@ function Activity({ athletes, activityLog = [], onSelect }) {
 }
 
 // ─── APP SHELL ────────────────────────────────────────────────────────────────
+const QUICK_ACCESS_KEY = "atlaua_quick_access";
+
 // ─── LOGIN SCREEN ───────────────────────────────────────────────────────────
 function LoginScreen({ onAuth }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState("");
   const [error, setError] = useState("");
-  const [mode, setMode] = useState("signin"); // "signin" or "signup"
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const quickAccess = (em) => {
+    setLoading(em);
     setError("");
-    const em = email.toLowerCase().trim();
-    if (!ALLOWED_EMAILS.includes(em)) {
-      setError("Access denied. This email is not authorized.");
-      return;
-    }
-    setLoading(true);
-    try {
-      if (mode === "signup") {
-        const { data: signUpData, error: err } = await supabase.auth.signUp({
-          email: em, password,
-          options: { data: { team_member: TEAM_EMAIL_MAP[em] || em } }
-        });
-        if (err) { setError(err.message); setLoading(false); return; }
-        // If session returned directly (email confirm disabled in Supabase), use it
-        if (signUpData?.session) { onAuth(signUpData.session); return; }
-        // If user was created but needs confirmation — tell them what to do
-        if (signUpData?.user && !signUpData?.session) {
-          setError("Account created! But email confirmation is ON in Supabase. Go to Supabase Dashboard → Authentication → Providers → Email → turn OFF 'Confirm email' → Save. Then come back and Sign In.");
-          setMode("signin");
-          setLoading(false);
-          return;
-        }
-        setError("Account may already exist. Try signing in instead.");
-        setMode("signin");
-        setLoading(false);
-        return;
-      }
-      const { data, error: err } = await supabase.auth.signInWithPassword({ email: em, password });
-      if (err) {
-        if (err.message.includes("Email not confirmed")) {
-          setError("Email not confirmed. Go to Supabase Dashboard → Authentication → Providers → Email → turn OFF 'Confirm email' → Save. Then try again.");
-        } else {
-          setError(err.message);
-        }
-        setLoading(false); return;
-      }
-      if (data?.session) onAuth(data.session);
-    } catch { setError("Something went wrong. Try again."); }
-    setLoading(false);
+    // Store in localStorage for session persistence
+    localStorage.setItem(QUICK_ACCESS_KEY, em);
+    const session = { user: { email: em }, quick_access: true };
+    // Small delay for visual feedback
+    setTimeout(() => onAuth(session), 300);
   };
 
   return (
@@ -3032,56 +3133,59 @@ function LoginScreen({ onAuth }) {
         <div style={{ background:C1, border:`1px solid ${BD2}`, borderRadius:20, padding:"36px 32px",
           boxShadow:`0 24px 64px rgba(0,0,0,0.5), 0 0 40px ${T}08` }}>
           <h2 style={{ margin:"0 0 6px", color:TX1, fontSize:20, fontWeight:800, textAlign:"center" }}>
-            {mode==="signin" ? "Welcome back" : "Create account"}
+            Welcome back
           </h2>
           <p style={{ margin:"0 0 28px", color:TX2, fontSize:13, textAlign:"center" }}>
-            {mode==="signin" ? "Sign in with your team email" : "Set up your team account"}
+            Select your profile to continue
           </p>
-          <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom:16 }}>
-              <label style={{ color:TX3, fontSize:10, fontWeight:700, letterSpacing:"0.12em",
-                textTransform:"uppercase", display:"block", marginBottom:6 }}>EMAIL</label>
-              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} required
-                placeholder="you@atlaua.de"
-                style={{ width:"100%", boxSizing:"border-box", padding:"12px 16px", background:C2,
-                  border:`1px solid ${BD}`, borderRadius:10, color:TX1, fontSize:14, outline:"none",
-                  fontFamily:"inherit", transition:"border 0.2s" }}
-                onFocus={e=>{ e.target.style.borderColor=T+"88"; e.target.style.boxShadow=`0 0 0 3px ${T}18`; }}
-                onBlur={e=>{ e.target.style.borderColor=BD; e.target.style.boxShadow="none"; }}/>
-            </div>
-            <div style={{ marginBottom:24 }}>
-              <label style={{ color:TX3, fontSize:10, fontWeight:700, letterSpacing:"0.12em",
-                textTransform:"uppercase", display:"block", marginBottom:6 }}>PASSWORD</label>
-              <input type="password" value={password} onChange={e=>setPassword(e.target.value)} required
-                placeholder="••••••••" minLength={6}
-                style={{ width:"100%", boxSizing:"border-box", padding:"12px 16px", background:C2,
-                  border:`1px solid ${BD}`, borderRadius:10, color:TX1, fontSize:14, outline:"none",
-                  fontFamily:"inherit", transition:"border 0.2s" }}
-                onFocus={e=>{ e.target.style.borderColor=T+"88"; e.target.style.boxShadow=`0 0 0 3px ${T}18`; }}
-                onBlur={e=>{ e.target.style.borderColor=BD; e.target.style.boxShadow="none"; }}/>
-            </div>
-            {error && (
-              <div style={{ background:WINE+"22", border:`1px solid ${WINE}44`, borderRadius:10,
-                padding:"10px 14px", marginBottom:18, color:"#ff6b8a", fontSize:13, fontWeight:500 }}>
-                {error}
-              </div>
-            )}
-            <button type="submit" disabled={loading}
-              style={{ width:"100%", padding:"13px 0", borderRadius:12, border:"none", cursor:loading?"wait":"pointer",
-                background:`linear-gradient(135deg, ${T}, ${T}CC)`, color:"#0A0613", fontSize:15,
-                fontWeight:700, fontFamily:"inherit", letterSpacing:"0.02em",
-                boxShadow:`0 4px 24px ${T}44`, transition:"all 0.2s",
-                opacity:loading?0.6:1 }}>
-              {loading ? "..." : mode==="signin" ? "Sign In" : "Create Account"}
-            </button>
-          </form>
-          <div style={{ textAlign:"center", marginTop:20 }}>
-            <button onClick={()=>{ setMode(mode==="signin"?"signup":"signin"); setError(""); }}
-              style={{ background:"none", border:"none", color:T, fontSize:13, cursor:"pointer",
-                fontFamily:"inherit", fontWeight:500, opacity:0.8 }}>
-              {mode==="signin" ? "First time? Create account" : "Already have an account? Sign in"}
-            </button>
+
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            {ALLOWED_EMAILS.map(em => {
+              const name = TEAM_EMAIL_MAP[em] || em;
+              const mc = MEMBER_COLORS[name] || T;
+              const isLoading = loading === em;
+              return (
+                <button key={em} onClick={() => quickAccess(em)} disabled={!!loading}
+                  style={{
+                    display:"flex", alignItems:"center", gap:16, padding:"16px 20px",
+                    background: isLoading ? mc + "22" : C2,
+                    border: `1.5px solid ${isLoading ? mc : BD}`,
+                    borderRadius:14, cursor: loading ? "wait" : "pointer",
+                    transition:"all 0.2s", fontFamily:"inherit",
+                    opacity: loading && !isLoading ? 0.4 : 1,
+                  }}
+                  onMouseEnter={e => { if (!loading) { e.currentTarget.style.background = mc + "18"; e.currentTarget.style.borderColor = mc + "66"; e.currentTarget.style.transform = "translateY(-1px)"; } }}
+                  onMouseLeave={e => { if (!loading) { e.currentTarget.style.background = isLoading ? mc + "22" : C2; e.currentTarget.style.borderColor = isLoading ? mc : BD; e.currentTarget.style.transform = "none"; } }}>
+                  <div style={{
+                    width:44, height:44, borderRadius:"50%",
+                    background:`linear-gradient(135deg, ${mc}33, ${mc}11)`,
+                    border:`2px solid ${mc}55`,
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                    color:mc, fontSize:18, fontWeight:800, flexShrink:0
+                  }}>{name[0]}</div>
+                  <div style={{ flex:1, textAlign:"left" }}>
+                    <div style={{ color:TX1, fontSize:16, fontWeight:700 }}>{name}</div>
+                    <div style={{ color:TX2, fontSize:12 }}>{em}</div>
+                  </div>
+                  {isLoading ? (
+                    <div style={{ color:mc, fontSize:12, fontWeight:600 }}>Loading...</div>
+                  ) : (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={TX3}
+                      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                  )}
+                </button>
+              );
+            })}
           </div>
+
+          {error && (
+            <div style={{ background:WINE+"22", border:`1px solid ${WINE}44`, borderRadius:10,
+              padding:"10px 14px", marginTop:18, color:"#ff6b8a", fontSize:13, fontWeight:500 }}>
+              {error}
+            </div>
+          )}
         </div>
         <div style={{ textAlign:"center", marginTop:20, color:TX3, fontSize:11 }}>
           Only authorized team members can access this CRM
@@ -3099,18 +3203,27 @@ export default function App() {
   const currentEmail = session?.user?.email || "";
 
   useEffect(() => {
+    // 1. Check for quick access session first (localStorage)
+    const quickEmail = localStorage.getItem(QUICK_ACCESS_KEY);
+    if (quickEmail && ALLOWED_EMAILS.includes(quickEmail.toLowerCase())) {
+      setSession({ user: { email: quickEmail.toLowerCase() }, quick_access: true });
+      setAuthLoading(false);
+      return;
+    }
+    // 2. Fallback to Supabase session
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       if (s && ALLOWED_EMAILS.includes(s.user?.email?.toLowerCase())) setSession(s);
       setAuthLoading(false);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_ev, s) => {
       if (s && ALLOWED_EMAILS.includes(s.user?.email?.toLowerCase())) setSession(s);
-      else if (!s) setSession(null);
+      else if (!s && !localStorage.getItem(QUICK_ACCESS_KEY)) setSession(null);
     });
     return () => subscription.unsubscribe();
   }, []);
 
   const signOut = useCallback(async () => {
+    localStorage.removeItem(QUICK_ACCESS_KEY);
     await supabase.auth.signOut();
     setSession(null);
   }, []);
@@ -3166,27 +3279,29 @@ export default function App() {
         }
         const { data:con } = await supabase.from("contacts").select("*");
         if(con) {
-          const needsRecat = [];
+          const needsUpdate = []; // contacts that need category or owner update in Supabase
           const mapped = con.map(c => {
             const current = c.category || "Other";
-            if (!CONTACT_CATS.includes(current)) {
-              const newCat = categorizeEmail(c.email || "", c.name || "", c.company || "");
-              needsRecat.push({ id: c.id, category: newCat });
-              return { ...c, athlete: c.name || "", owner: c.owner || "Carlos", category: newCat };
+            const ownerOk = !!c.owner;
+            const catOk = CONTACT_CATS.includes(current);
+            const newCat = catOk ? current : categorizeEmail(c.email || "", c.name || "", c.company || "");
+            const newOwner = c.owner || "Carlos";
+            if (!catOk || !ownerOk) {
+              needsUpdate.push({ id: c.id, ...(!catOk ? { category: newCat } : {}), ...(!ownerOk ? { owner: newOwner } : {}) });
             }
-            return { ...c, athlete: c.name || "", owner: c.owner || "Carlos" };
+            return { ...c, athlete: c.name || "", owner: newOwner, category: newCat };
           });
           setContacts(mapped);
-          // Batch update re-categorized contacts in Supabase (fire and forget)
-          if (needsRecat.length > 0) {
+          // Batch update contacts that need category or owner fix in Supabase (fire and forget)
+          if (needsUpdate.length > 0) {
             (async () => {
-              for (let i = 0; i < needsRecat.length; i += 50) {
-                const batch = needsRecat.slice(i, i + 50);
-                await Promise.all(batch.map(({ id, category }) =>
-                  supabase.from("contacts").update({ category }).eq("id", id)
+              for (let i = 0; i < needsUpdate.length; i += 50) {
+                const batch = needsUpdate.slice(i, i + 50);
+                await Promise.all(batch.map(({ id, ...fields }) =>
+                  supabase.from("contacts").update(fields).eq("id", id)
                 ));
               }
-              console.log(`Re-categorized ${needsRecat.length} contacts`);
+              console.log(`Fixed ${needsUpdate.length} contacts (category/owner)`);
             })();
           }
         }
@@ -3248,6 +3363,10 @@ export default function App() {
   },[athletes, contacts, logActivity, currentUser]);
 
   const importBatch = useCallback(async (rows, mode) => {
+    // Gmail sync uses "refresh" mode to replace all contacts with fresh data from Supabase
+    if (mode === "refresh") { setContacts(rows); return; }
+    // Gmail sync uses "noop" mode for single-row state updates during fallback insert
+    if (mode === "noop") { setContacts(prev => { const ids = new Set(prev.map(c=>c.id)); const newOnes = rows.filter(r=>!ids.has(r.id)); return newOnes.length ? [...newOnes,...prev] : prev; }); return; }
     if(mode==="athletes") {
       const existingNames = new Set(athletes.map(a => (a.athlete||"").toLowerCase().trim()));
       const mapped = rows.map(r=>({
@@ -3369,9 +3488,22 @@ export default function App() {
   const clearMemberContacts = useCallback(async (member) => {
     const count = contacts.filter(c => (c.owner || "Carlos") === member).length;
     if (!count || !window.confirm(`Delete all ${count} contacts for ${member}? This cannot be undone.`)) return;
-    await supabase.from("contacts").delete().eq("owner", member);
-    setContacts(prev => prev.filter(c => (c.owner || "Carlos") !== member));
-    logActivity("Cleared contacts", `All ${count} contacts for ${member}`);
+    try {
+      // Delete contacts where owner matches
+      const { error: e1 } = await supabase.from("contacts").delete().eq("owner", member);
+      if (e1) console.error("Delete by owner failed:", e1.message);
+      // Also delete contacts where owner is null/empty (these show as "Carlos" in the UI)
+      if (member === "Carlos") {
+        const { error: e2 } = await supabase.from("contacts").delete().is("owner", null);
+        if (e2) console.error("Delete null owner failed:", e2.message);
+        const { error: e3 } = await supabase.from("contacts").delete().eq("owner", "");
+        if (e3) console.error("Delete empty owner failed:", e3.message);
+      }
+      setContacts(prev => prev.filter(c => (c.owner || "Carlos") !== member));
+      logActivity("Cleared contacts", `All ${count} contacts for ${member}`);
+    } catch (err) {
+      alert(`Error clearing contacts: ${err.message}`);
+    }
   }, [contacts, logActivity]);
 
   const bulkCategoryChange = useCallback(async (ids, newCategory) => {
