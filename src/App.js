@@ -1205,7 +1205,7 @@ function ImportCSVModal({ onClose, onImport, mode = "athletes" }) {
 }
 
 // ─── GMAIL CONNECT MODAL ──────────────────────────────────────────────────────
-function GmailConnectModal({ onClose, onImport }) {
+function GmailConnectModal({ onClose, onImport, defaultOwner="Carlos" }) {
   const [step, setStep]   = useState(0); // 0=info, 1=loading, 2=preview, 3=done
   const [token, setToken] = useState(null);
   const [contacts, setContacts] = useState([]);
@@ -1214,7 +1214,7 @@ function GmailConnectModal({ onClose, onImport }) {
   const [progress, setProgress] = useState(0);
   const [query, setQuery]   = useState("");
   const [filterCat, setFilterCat] = useState("All");
-  const [syncOwner, setSyncOwner] = useState("Carlos");
+  const [syncOwner, setSyncOwner] = useState(defaultOwner);
 
   const loadGSI = () => new Promise((res, rej) => {
     if (window.google?.accounts) { res(); return; }
@@ -2482,7 +2482,7 @@ function ContactPanel({ contact, onClose, onSave }) {
 }
 
 // ─── CONTACTS (Grouped) ───────────────────────────────────────────────────────
-function Contacts({ contacts, onImport, onUpdateContact, onClearMember, onBulkCategoryChange }) {
+function Contacts({ contacts, onImport, onUpdateContact, onClearMember, onBulkCategoryChange, currentUser="Carlos" }) {
   const [q, setQ]         = useState("");
   const [showImport, setShowImport]   = useState(false);
   const [showGmail, setShowGmail]     = useState(false);
@@ -2699,8 +2699,8 @@ function Contacts({ contacts, onImport, onUpdateContact, onClearMember, onBulkCa
       )}
 
       {showImport && <ImportCSVModal onClose={()=>setShowImport(false)} onImport={onImport} mode="contacts"/>}
-      {showGmail  && <GmailConnectModal onClose={()=>setShowGmail(false)} onImport={(rows, mode) => {
-        const tagged = rows.map(r => ({ ...r, owner: r.owner || "Carlos" }));
+      {showGmail  && <GmailConnectModal onClose={()=>setShowGmail(false)} defaultOwner={currentUser} onImport={(rows, mode) => {
+        const tagged = rows.map(r => ({ ...r, owner: r.owner || currentUser }));
         onImport(tagged, mode);
       }}/>}
       {editContact && <ContactPanel contact={editContact} onClose={()=>setEditContact(null)} onSave={onUpdateContact}/>}
@@ -2930,37 +2930,10 @@ function Activity({ athletes, activityLog = [], onSelect }) {
 // ─── LOGIN SCREEN ───────────────────────────────────────────────────────────
 function LoginScreen({ onAuth }) {
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [linkSent, setLinkSent] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
-
-  useEffect(() => {
-    if (cooldown <= 0) return;
-    const t = setTimeout(() => setCooldown(c => c - 1), 1000);
-    return () => clearTimeout(t);
-  }, [cooldown]);
-
-  const sendLink = async (em) => {
-    if (cooldown > 0) return;
-    setLoading(true);
-    setError("");
-    try {
-      const { error: otpErr } = await supabase.auth.signInWithOtp({
-        email: em,
-        options: { emailRedirectTo: window.location.origin }
-      });
-      if (otpErr) {
-        const msg = otpErr.message.toLowerCase().includes("rate limit")
-          ? "Please wait a moment before requesting another link."
-          : otpErr.message;
-        setError(msg); setCooldown(60); setLoading(false); return;
-      }
-      setLinkSent(true);
-      setCooldown(60);
-    } catch { setError("Something went wrong. Try again."); }
-    setLoading(false);
-  };
+  const [mode, setMode] = useState("signin"); // "signin" or "signup"
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -2970,13 +2943,27 @@ function LoginScreen({ onAuth }) {
       setError("Access denied. This email is not authorized.");
       return;
     }
-    await sendLink(em);
+    setLoading(true);
+    try {
+      if (mode === "signup") {
+        const { error: err } = await supabase.auth.signUp({ email: em, password });
+        if (err) { setError(err.message); setLoading(false); return; }
+        setError("");
+        setMode("signin");
+        setLoading(false);
+        alert("Account created! Check your email to confirm, then sign in.");
+        return;
+      }
+      const { data, error: err } = await supabase.auth.signInWithPassword({ email: em, password });
+      if (err) { setError(err.message); setLoading(false); return; }
+      if (data?.session) onAuth(data.session);
+    } catch { setError("Something went wrong. Try again."); }
+    setLoading(false);
   };
 
   return (
     <div style={{ minHeight:"100vh", background:BG, display:"flex", alignItems:"center", justifyContent:"center",
       fontFamily:"'Inter','Codec Pro',system-ui,-apple-system,sans-serif" }}>
-      {/* Background orbs */}
       <div style={{ position:"fixed", inset:0, overflow:"hidden", pointerEvents:"none" }}>
         <div style={{ position:"absolute", width:500, height:500, borderRadius:"50%",
           background:`radial-gradient(circle, ${T}12, transparent 70%)`, top:"-10%", right:"-5%" }}/>
@@ -2984,7 +2971,6 @@ function LoginScreen({ onAuth }) {
           background:`radial-gradient(circle, ${WINE}10, transparent 70%)`, bottom:"-8%", left:"-5%" }}/>
       </div>
       <div style={{ position:"relative", zIndex:1, width:"min(420px, 90vw)" }}>
-        {/* Logo */}
         <div style={{ textAlign:"center", marginBottom:36 }}>
           <div style={{ filter:"drop-shadow(0 4px 24px rgba(4,189,183,0.3))", display:"inline-block" }}>
             <AtlauaJaguarLogo size={72}/>
@@ -2992,72 +2978,60 @@ function LoginScreen({ onAuth }) {
           <div style={{ color:TX1, fontSize:22, fontWeight:800, letterSpacing:"0.04em", marginTop:16 }}>ATLAUA</div>
           <div style={{ color:T, fontSize:10, letterSpacing:"0.2em", fontWeight:600, opacity:0.7 }}>SPORTS CRM</div>
         </div>
-        {/* Card */}
         <div style={{ background:C1, border:`1px solid ${BD2}`, borderRadius:20, padding:"36px 32px",
           boxShadow:`0 24px 64px rgba(0,0,0,0.5), 0 0 40px ${T}08` }}>
-          {!linkSent ? (<>
-            <h2 style={{ margin:"0 0 6px", color:TX1, fontSize:20, fontWeight:800, textAlign:"center" }}>
-              Welcome back
-            </h2>
-            <p style={{ margin:"0 0 28px", color:TX2, fontSize:13, textAlign:"center" }}>
-              Enter your team email to receive a login link
-            </p>
-            <form onSubmit={handleSubmit}>
-              <div style={{ marginBottom:24 }}>
-                <label style={{ color:TX3, fontSize:10, fontWeight:700, letterSpacing:"0.12em",
-                  textTransform:"uppercase", display:"block", marginBottom:6 }}>EMAIL</label>
-                <input type="email" value={email} onChange={e=>setEmail(e.target.value)} required
-                  placeholder="you@atlaua.de"
-                  style={{ width:"100%", boxSizing:"border-box", padding:"12px 16px", background:C2,
-                    border:`1px solid ${BD}`, borderRadius:10, color:TX1, fontSize:14, outline:"none",
-                    fontFamily:"inherit", transition:"border 0.2s" }}
-                  onFocus={e=>{ e.target.style.borderColor=T+"88"; e.target.style.boxShadow=`0 0 0 3px ${T}18`; }}
-                  onBlur={e=>{ e.target.style.borderColor=BD; e.target.style.boxShadow="none"; }}/>
-              </div>
-              {error && (
-                <div style={{ background:WINE+"22", border:`1px solid ${WINE}44`, borderRadius:10,
-                  padding:"10px 14px", marginBottom:18, color:"#ff6b8a", fontSize:13, fontWeight:500 }}>
-                  {error}
-                </div>
-              )}
-              <button type="submit" disabled={loading}
-                style={{ width:"100%", padding:"13px 0", borderRadius:12, border:"none", cursor:loading?"wait":"pointer",
-                  background:`linear-gradient(135deg, ${T}, ${T}CC)`, color:"#0A0613", fontSize:15,
-                  fontWeight:700, fontFamily:"inherit", letterSpacing:"0.02em",
-                  boxShadow:`0 4px 24px ${T}44`, transition:"all 0.2s",
-                  opacity:loading?0.6:1 }}>
-                {loading ? "Sending..." : "Send Magic Link"}
-              </button>
-            </form>
-          </>) : (<>
-            {/* Link sent confirmation */}
-            <div style={{ textAlign:"center" }}>
-              <div style={{ fontSize:48, marginBottom:16 }}>✉️</div>
-              <h2 style={{ margin:"0 0 8px", color:TX1, fontSize:20, fontWeight:800 }}>Check your inbox</h2>
-              <p style={{ margin:"0 0 20px", color:TX2, fontSize:13, lineHeight:1.6 }}>
-                We sent a login link to<br/>
-                <span style={{ color:T, fontWeight:600 }}>{email.toLowerCase().trim()}</span>
-              </p>
-              <p style={{ margin:"0 0 20px", color:TX3, fontSize:12 }}>
-                Click the link in the email to sign in. Check spam if you don't see it.
-              </p>
-              <button onClick={()=>sendLink(email.toLowerCase().trim())} disabled={cooldown > 0 || loading}
-                style={{ width:"100%", padding:"11px 0", borderRadius:10, border:`1px solid ${cooldown>0?BD:T+"66"}`,
-                  background: cooldown>0 ? "transparent" : T+"18", color: cooldown>0 ? TX3 : T,
-                  fontSize:13, fontWeight:600, fontFamily:"inherit", cursor: cooldown>0?"default":"pointer",
-                  marginBottom:14, transition:"all 0.2s" }}>
-                {loading ? "Sending..." : cooldown > 0 ? `Resend link (${cooldown}s)` : "Resend login link"}
-              </button>
-              <button onClick={()=>{ setLinkSent(false); setError(""); setCooldown(0); }}
-                style={{ background:"none", border:"none", color:T, fontSize:13, cursor:"pointer",
-                  fontFamily:"inherit", fontWeight:500, opacity:0.8, transition:"opacity 0.2s" }}
-                onMouseEnter={e=>e.target.style.opacity=1} onMouseLeave={e=>e.target.style.opacity=0.8}>
-                Use a different email
-              </button>
+          <h2 style={{ margin:"0 0 6px", color:TX1, fontSize:20, fontWeight:800, textAlign:"center" }}>
+            {mode==="signin" ? "Welcome back" : "Create account"}
+          </h2>
+          <p style={{ margin:"0 0 28px", color:TX2, fontSize:13, textAlign:"center" }}>
+            {mode==="signin" ? "Sign in with your team email" : "Set up your team account"}
+          </p>
+          <form onSubmit={handleSubmit}>
+            <div style={{ marginBottom:16 }}>
+              <label style={{ color:TX3, fontSize:10, fontWeight:700, letterSpacing:"0.12em",
+                textTransform:"uppercase", display:"block", marginBottom:6 }}>EMAIL</label>
+              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} required
+                placeholder="you@atlaua.de"
+                style={{ width:"100%", boxSizing:"border-box", padding:"12px 16px", background:C2,
+                  border:`1px solid ${BD}`, borderRadius:10, color:TX1, fontSize:14, outline:"none",
+                  fontFamily:"inherit", transition:"border 0.2s" }}
+                onFocus={e=>{ e.target.style.borderColor=T+"88"; e.target.style.boxShadow=`0 0 0 3px ${T}18`; }}
+                onBlur={e=>{ e.target.style.borderColor=BD; e.target.style.boxShadow="none"; }}/>
             </div>
-          </>)}
+            <div style={{ marginBottom:24 }}>
+              <label style={{ color:TX3, fontSize:10, fontWeight:700, letterSpacing:"0.12em",
+                textTransform:"uppercase", display:"block", marginBottom:6 }}>PASSWORD</label>
+              <input type="password" value={password} onChange={e=>setPassword(e.target.value)} required
+                placeholder="••••••••" minLength={6}
+                style={{ width:"100%", boxSizing:"border-box", padding:"12px 16px", background:C2,
+                  border:`1px solid ${BD}`, borderRadius:10, color:TX1, fontSize:14, outline:"none",
+                  fontFamily:"inherit", transition:"border 0.2s" }}
+                onFocus={e=>{ e.target.style.borderColor=T+"88"; e.target.style.boxShadow=`0 0 0 3px ${T}18`; }}
+                onBlur={e=>{ e.target.style.borderColor=BD; e.target.style.boxShadow="none"; }}/>
+            </div>
+            {error && (
+              <div style={{ background:WINE+"22", border:`1px solid ${WINE}44`, borderRadius:10,
+                padding:"10px 14px", marginBottom:18, color:"#ff6b8a", fontSize:13, fontWeight:500 }}>
+                {error}
+              </div>
+            )}
+            <button type="submit" disabled={loading}
+              style={{ width:"100%", padding:"13px 0", borderRadius:12, border:"none", cursor:loading?"wait":"pointer",
+                background:`linear-gradient(135deg, ${T}, ${T}CC)`, color:"#0A0613", fontSize:15,
+                fontWeight:700, fontFamily:"inherit", letterSpacing:"0.02em",
+                boxShadow:`0 4px 24px ${T}44`, transition:"all 0.2s",
+                opacity:loading?0.6:1 }}>
+              {loading ? "..." : mode==="signin" ? "Sign In" : "Create Account"}
+            </button>
+          </form>
+          <div style={{ textAlign:"center", marginTop:20 }}>
+            <button onClick={()=>{ setMode(mode==="signin"?"signup":"signin"); setError(""); }}
+              style={{ background:"none", border:"none", color:T, fontSize:13, cursor:"pointer",
+                fontFamily:"inherit", fontWeight:500, opacity:0.8 }}>
+              {mode==="signin" ? "First time? Create account" : "Already have an account? Sign in"}
+            </button>
+          </div>
         </div>
-        {/* Authorized emails hint */}
         <div style={{ textAlign:"center", marginTop:20, color:TX3, fontSize:11 }}>
           Only authorized team members can access this CRM
         </div>
@@ -3189,14 +3163,14 @@ export default function App() {
         category: form.category || categorizeEmail(form.email || "", form.name || form.athlete || "", form.company || form.agency || ""),
         email: form.email || "",
         phone: form.phone || "",
-        owner: form.owner || "Carlos"
+        owner: form.owner || currentUser
       };
       const { data } = await supabase.from("contacts").insert([dbRow]).select();
-      if(data?.length) setContacts(prev=>[{ ...data[0], athlete: data[0].name, owner: data[0].owner || "Carlos" },...prev]);
+      if(data?.length) setContacts(prev=>[{ ...data[0], athlete: data[0].name, owner: data[0].owner || currentUser },...prev]);
       else setContacts(prev=>[{ ...dbRow, athlete: dbRow.name },...prev]);
       logActivity("Added contact", form.athlete || form.name);
     }
-  },[athletes, contacts, logActivity]);
+  },[athletes, contacts, logActivity, currentUser]);
 
   const importBatch = useCallback(async (rows, mode) => {
     if(mode==="athletes") {
@@ -3226,7 +3200,7 @@ export default function App() {
         name:r.name||r.athlete||"",company:r.company||r.agency||"",
         category:r.category||categorizeEmail(r.email||"",r.name||r.athlete||"",r.company||r.agency||""),
         email:r.email||"",phone:r.phone||"",
-        owner:r.owner||"Carlos"
+        owner:r.owner||currentUser
       })).filter(r=>r.name||r.email);
       const dupes = mapped.filter(r => existingEmails.has((r.email||"").toLowerCase().trim()));
       let toImport = mapped;
@@ -3242,7 +3216,7 @@ export default function App() {
       }
       logActivity("Imported contacts", `${toImport.length} records`);
     }
-  },[athletes, contacts, logActivity]);
+  },[athletes, contacts, logActivity, currentUser]);
 
   const updContact = useCallback(async updated => {
     if (updated.id) {
@@ -3586,11 +3560,13 @@ export default function App() {
           )}
           <div style={{ marginLeft:"auto", display:"flex", gap:isMobile?8:12, alignItems:"center" }}>
             <Btn size="sm" onClick={()=>setShowAdd(true)} icon="+">{isMobile?"":"New Record"}</Btn>
-            <div style={{ width:34, height:34, borderRadius:"50%",
-              background:`linear-gradient(135deg, ${T}33, ${WINE}33)`,
-              border:`1.5px solid ${T}55`, display:"flex", alignItems:"center", justifyContent:"center",
-              color:T, fontSize:13, fontWeight:800, cursor:"pointer",
-              boxShadow:`0 0 12px ${T}15` }}>{currentUser[0]}</div>
+            {!isMobile && <span style={{ color:TX2, fontSize:12, fontWeight:500 }}>{currentUser}</span>}
+            <div onClick={signOut} title={`Signed in as ${currentUser} (${currentEmail})\nClick to sign out`}
+              style={{ width:34, height:34, borderRadius:"50%",
+              background:`linear-gradient(135deg, ${MEMBER_COLORS[currentUser]||T}33, ${WINE}33)`,
+              border:`1.5px solid ${MEMBER_COLORS[currentUser]||T}55`, display:"flex", alignItems:"center", justifyContent:"center",
+              color:MEMBER_COLORS[currentUser]||T, fontSize:13, fontWeight:800, cursor:"pointer",
+              boxShadow:`0 0 12px ${MEMBER_COLORS[currentUser]||T}15` }}>{currentUser[0]}</div>
           </div>
         </header>
 
@@ -3603,7 +3579,7 @@ export default function App() {
           {page==="Agencies"  && <Agencies  athletes={globalFiltered.athletes} onSelect={setSel}/>}
           {page==="Teams"     && <Teams     athletes={globalFiltered.athletes} onSelect={setSel}/>}
           {page==="Pipeline"  && <Pipeline  athletes={globalFiltered.athletes} onUpdate={upd} onSelect={setSel}/>}
-          {page==="Contacts"  && <Contacts  contacts={globalFiltered.contacts} onImport={importBatch} onUpdateContact={updContact} onClearMember={clearMemberContacts} onBulkCategoryChange={bulkCategoryChange}/>}
+          {page==="Contacts"  && <Contacts  contacts={globalFiltered.contacts} onImport={importBatch} onUpdateContact={updContact} onClearMember={clearMemberContacts} onBulkCategoryChange={bulkCategoryChange} currentUser={currentUser}/>}
           {page==="Activity"  && <Activity  athletes={athletes} activityLog={activityLog} onSelect={setSel}/>}
           {page==="Export"    && <Export    athletes={globalFiltered.athletes} contacts={globalFiltered.contacts}/>}
         </main>
