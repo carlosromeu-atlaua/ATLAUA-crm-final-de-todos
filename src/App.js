@@ -756,16 +756,63 @@ function parseEmailAddresses(header) {
   return results;
 }
 
-function categorizeEmail(email) {
+// ─── CONTACT CATEGORIES ───────────────────────────────────────────────────────
+const CONTACT_CATS = [
+  "Investors & Capital","Athletes & Ambassadors","Strategic Partners","Media & Press","Community & Club Members",
+  "Retail & Distribution",
+  "Manufacturing & Production","Suppliers","Logistics & Fulfillment",
+  "Advisors & Mentors","Internal Network",
+  "Other"
+];
+
+function categorizeEmail(email, name, company) {
   const domain = (email.split("@")[1] || "").toLowerCase();
-  const agencyKw = /roc|caa|wasserman|klutch|rosenhaus|wme|vayner|img|boras|endeavor|sportstrust|steinberg|athletes.?first|disruptive|aura|equity.?sport|paraphe|net.?sport|goal.?line|uasport|delta.?sport|priority|hof.?player|intersport|global.?sport|klutch|gpg|creative.?artist|united.?talent|octagon/;
-  const teamKw   = /nfl\.com|nba\.com|nhl\.com|mlb\.com|seahawks|dolphins|lakers|celtics|yankees|cowboys|chiefs|bulls|heat|mavs|knicks|warriors|bruins|leafs|canucks|rangers|cubs|astros|redsox/;
-  const mediaKw  = /espn|nbc|cbs|fox|bleacher|athletic|si\.com|nfl\.com|nba\.com|sportnews|thescore|deadspin|sport|media|press|journal|times|post|herald/;
-  if (agencyKw.test(domain)) return "Agency";
-  if (teamKw.test(domain))   return "Team";
-  if (mediaKw.test(domain))  return "Media";
-  if (/gmail|yahoo|hotmail|outlook|icloud/.test(domain)) return "Other";
-  return "Brand";
+  const text = `${domain} ${(name||"").toLowerCase()} ${(company||"").toLowerCase()}`;
+
+  // Internal Network — @atlaua.de team emails, freelancers, agencies, consultants, service providers
+  if (domain.includes("atlaua")) return "Internal Network";
+
+  // Internal Network — talent/sports agencies, creative agencies, service providers
+  if (/\broc\b|caa|wasserman|klutch|rosenhaus|wme|vayner|\bimg\b|boras|endeavor|sportstrust|steinberg|athletes.?first|octagon|creative.?artist|united.?talent|gpg|disruptive|paraphe|net.?sport|goal.?line|uasport|delta.?sport|intersport|global.?sport|hof.?player|agency|agentur/.test(text)) return "Internal Network";
+
+  // Investors & Capital — VCs, angels, family offices, strategic investors
+  if (/invest|venture|capital|\bfund\b|angel|\bvc\b|equity|holdings|fintech|private.?equity|seed|series.?[abc]|family.?office|portfolio/.test(text)) return "Investors & Capital";
+
+  // Athletes & Ambassadors — pros, rising athletes, influencers, ambassadors
+  if (/athlete|player|ambassador|influencer|talent|champion|olymp|draft|prospect|fitness.?model|brand.?face/.test(text)) return "Athletes & Ambassadors";
+
+  // Media & Press — journalists, podcasts, sports media, wellness media, content creators
+  if (/espn|nbc|cbs|fox|bleacher|athletic|si\.com|media|press|journal|times|news|broadcast|podcast|magazine|editorial|reporter|writer|blog|\btv\b|radio|streaming|content.?creator|influencer.?market/.test(text)) return "Media & Press";
+
+  // Manufacturing & Production — co-packers, bottling, labs, formulation, packaging, quality
+  if (/manufactur|produc|factory|bottl|co.?pack|private.?label|formul|\blab\b|quality.?control|\bgmp\b|\bfda\b|packag|assembl|fabric|textile|garment|sew|embroid|screen.?print|prototype/.test(text)) return "Manufacturing & Production";
+
+  // Suppliers — ingredients, bottles, labels, caps, CBD, electrolyte, raw materials
+  if (/suppli|vendor|procure|raw.?material|ingredient|electrolyte|\bcbd\b|functional.?ingredient|bottle.?suppli|label.?suppli|cap.?suppli|closure|secondary.?packag/.test(text)) return "Suppliers";
+
+  // Logistics & Fulfillment — freight, warehousing, fulfillment, cold chain, customs
+  if (/logistic|fulfil|shipping|freight|warehouse|delivery|courier|\bdhl\b|\bfedex\b|\bups\b|3pl|dispatch|transport|cargo|cold.?chain|import.?export|customs.?broker/.test(text)) return "Logistics & Fulfillment";
+
+  // Retail & Distribution — premium retail, gyms, health stores, hotels, bars, distributors, importers
+  if (/retail|distribut|wholesale|\bstore\b|\bshop\b|ecommerce|marketplace|boutique|resell|stockist|\bgym\b|fitness.?chain|health.?store|hotel|beach.?club|\bbar\b|importer/.test(text)) return "Retail & Distribution";
+
+  // Advisors & Mentors — business, legal, regulatory, industry experts
+  if (/advisor|consult|counsel|mentor|legal|\blaw\b|attorney|account|audit|regulat|\bcfo\b|\bcto\b|board|expert/.test(text)) return "Advisors & Mentors";
+
+  // Strategic Partners — sports leagues, gyms, wellness, hospitality, events, tech
+  if (/partner|collab|alliance|sponsor|foundation|\bngo\b|charity|assoc|federation|league|union|co.?brand|joint.?venture|baller.?league|converge.?labs|wellness|hospitality|festival/.test(text)) return "Strategic Partners";
+
+  // Community & Club Members — club tiers, supporters, founding members
+  if (/club|community|member|fan|supporter|youth|academy|grassroot|volunteer|founding|vip|elyte/.test(text)) return "Community & Club Members";
+
+  // Sports teams — categorize as Strategic Partners
+  if (/nfl\.com|nba\.com|nhl\.com|mlb\.com|seahawks|dolphins|lakers|celtics|yankees|cowboys|chiefs|bulls|heat|mavs|knicks|warriors/.test(domain)) return "Strategic Partners";
+
+  // Free email domains → Other
+  if (/gmail|yahoo|hotmail|outlook|icloud|proton|aol|live\.com|msn/.test(domain)) return "Other";
+
+  // Default — unknown business domains
+  return "Other";
 }
 
 function formatDate(dateStr) {
@@ -1232,7 +1279,7 @@ function GmailConnectModal({ onClose, onImport }) {
                 if (!contactMap.has(email)) {
                   contactMap.set(email, {
                     name, email,
-                    category: categorizeEmail(email),
+                    category: categorizeEmail(email, name, ""),
                     source:"Gmail History",
                     count:1
                   });
@@ -1312,7 +1359,7 @@ function GmailConnectModal({ onClose, onImport }) {
                 {[
                   ["1", "Sign in with your Google account using secure OAuth 2.0"],
                   ["2", "ATLAUA reads your sent email headers only — never email bodies"],
-                  ["3", "Unique recipients are extracted and auto-categorized (Agency, Brand, Media, Team...)"],
+                  ["3", "Unique recipients are extracted and auto-categorized into 11 categories"],
                   ["4", "You review & select which contacts to import into the CRM"],
                   ["5", "Your Gmail token is never stored — it expires when you close the tab"]
                 ].map(([n,t])=>(
@@ -1401,7 +1448,7 @@ function GmailConnectModal({ onClose, onImport }) {
                     <div style={{ color:TX1, fontSize:13, fontWeight:600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.name}</div>
                     <div style={{ color:TX2, fontSize:11, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.email}</div>
                   </div>
-                  <Tag label={c.category} color={categorizeEmail(c.email)==="Agency"?T:categorizeEmail(c.email)==="Team"?WINE:GOLD}/>
+                  <Tag label={c.category} color={PCOLS[CONTACT_CATS.indexOf(c.category)%PCOLS.length]||GOLD}/>
                   <div style={{ color:TX3, fontSize:11 }}>{c.count}×</div>
                 </div>
               ))}
@@ -1616,7 +1663,7 @@ function AddModal({ onClose, onAdd }) {
         <select value={form[key]} onChange={e=>upd(key,e.target.value)}
           style={{ background:C2, border:`1px solid ${BD}`, borderRadius:8, padding:"9px 12px",
             color:TX1, fontSize:13, width:"100%", outline:"none", fontFamily:"inherit" }}>
-          {(key==="league"?LEAGUES:key==="category"?["Agency","Brand","Media","Team","Partner","Distributor","Other"]:STATUSES).map(o=><option key={o}>{o}</option>)}
+          {(key==="league"?LEAGUES:key==="category"?CONTACT_CATS:STATUSES).map(o=><option key={o}>{o}</option>)}
         </select>
       ) : (
         <input value={form[key]||""} type={type} onChange={e=>upd(key,e.target.value)}
@@ -2365,7 +2412,7 @@ function Pipeline({ athletes, onUpdate, onSelect }) {
 function ContactPanel({ contact, onClose, onSave }) {
   const [ed, setEd] = useState({ ...contact });
   const [saving, setSaving] = useState(false);
-  const cats = ["Agency","Brand","Media","Team","Partner","Distributor","Other"];
+  const cats = CONTACT_CATS;
 
   const save = async () => { setSaving(true); await onSave(ed); setSaving(false); onClose(); };
 
@@ -2425,16 +2472,16 @@ function ContactPanel({ contact, onClose, onSave }) {
 }
 
 // ─── CONTACTS (Grouped) ───────────────────────────────────────────────────────
-function Contacts({ contacts, onImport, onUpdateContact }) {
+function Contacts({ contacts, onImport, onUpdateContact, onClearMember }) {
   const [q, setQ]         = useState("");
   const [showImport, setShowImport]   = useState(false);
   const [showGmail, setShowGmail]     = useState(false);
-  const [openCats, setOpenCats]       = useState(new Set(["Agency","Brand","Media","Team","Partner","Other"]));
+  const [openCats, setOpenCats]       = useState(new Set(CONTACT_CATS));
   const [filterCat, setFilterCat]     = useState("All");
   const [filterOwner, setFilterOwner] = useState("All");
   const [editContact, setEditContact] = useState(null);
 
-  const cats = ["Agency","Brand","Media","Team","Partner","Distributor","Other"];
+  const cats = CONTACT_CATS;
   const filtered = useMemo(()=>contacts.filter(c=>
     (filterCat==="All"||c.category===filterCat) &&
     (filterOwner==="All"||(c.owner||"Carlos")===filterOwner) &&
@@ -2503,6 +2550,14 @@ function Contacts({ contacts, onImport, onUpdateContact }) {
             </button>
           );
         })}
+        {filterOwner !== "All" && ownerCounts[filterOwner] > 0 && (
+          <button onClick={()=>onClearMember(filterOwner)}
+            style={{ padding:"7px 14px", borderRadius:10, cursor:"pointer", fontWeight:600, fontSize:12,
+              fontFamily:"inherit", transition:"all 0.18s", border:`1px solid #ff4d4d44`,
+              background:"#ff4d4d18", color:"#ff4d4d", marginLeft:4 }}>
+            Clear {filterOwner}'s List
+          </button>
+        )}
       </div>
 
       <div style={{ display:"flex", gap:10, marginBottom:20, flexWrap:"wrap" }}>
@@ -3051,7 +3106,7 @@ export default function App() {
       const dbRow = {
         name: form.athlete || form.name || "",
         company: form.agency || form.company || "",
-        category: form.category || categorizeEmail(form.email || ""),
+        category: form.category || categorizeEmail(form.email || "", form.name || form.athlete || "", form.company || form.agency || ""),
         email: form.email || "",
         phone: form.phone || "",
         owner: form.owner || "Carlos"
@@ -3089,7 +3144,7 @@ export default function App() {
       const existingEmails = new Set(contacts.map(c => (c.email||"").toLowerCase().trim()));
       const mapped = rows.map(r=>({
         name:r.name||r.athlete||"",company:r.company||r.agency||"",
-        category:r.category||categorizeEmail(r.email||""),
+        category:r.category||categorizeEmail(r.email||"",r.name||r.athlete||"",r.company||r.agency||""),
         email:r.email||"",phone:r.phone||"",
         owner:r.owner||"Carlos"
       })).filter(r=>r.name||r.email);
@@ -3168,6 +3223,14 @@ export default function App() {
     logActivity("Bulk status update", `${toUpdate.length} athletes`, `Changed to ${newStatus}`);
     setBulkSelected(new Set());
   }, [athletes, bulkSelected, logActivity]);
+
+  const clearMemberContacts = useCallback(async (member) => {
+    const count = contacts.filter(c => (c.owner || "Carlos") === member).length;
+    if (!count || !window.confirm(`Delete all ${count} contacts for ${member}? This cannot be undone.`)) return;
+    await supabase.from("contacts").delete().eq("owner", member);
+    setContacts(prev => prev.filter(c => (c.owner || "Carlos") !== member));
+    logActivity("Cleared contacts", `All ${count} contacts for ${member}`);
+  }, [contacts, logActivity]);
 
   // ─── GLOBAL SEARCH FILTERING ───────────────────────────────────────────────
   const globalFiltered = useMemo(() => {
@@ -3451,7 +3514,7 @@ export default function App() {
           {page==="Agencies"  && <Agencies  athletes={globalFiltered.athletes} onSelect={setSel}/>}
           {page==="Teams"     && <Teams     athletes={globalFiltered.athletes} onSelect={setSel}/>}
           {page==="Pipeline"  && <Pipeline  athletes={globalFiltered.athletes} onUpdate={upd} onSelect={setSel}/>}
-          {page==="Contacts"  && <Contacts  contacts={globalFiltered.contacts} onImport={importBatch} onUpdateContact={updContact}/>}
+          {page==="Contacts"  && <Contacts  contacts={globalFiltered.contacts} onImport={importBatch} onUpdateContact={updContact} onClearMember={clearMemberContacts}/>}
           {page==="Activity"  && <Activity  athletes={athletes} activityLog={activityLog} onSelect={setSel}/>}
           {page==="Export"    && <Export    athletes={globalFiltered.athletes} contacts={globalFiltered.contacts}/>}
         </main>
