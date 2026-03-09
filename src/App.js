@@ -2035,7 +2035,7 @@ function Athletes({ athletes, onSelect, onImport, bulkSelected, setBulkSelected,
                   <th style={{ padding:"10px 8px", borderBottom:`1px solid ${BD}`, width:36 }}>
                     <div onClick={()=>{
                       if(bulkSelected.size===paged.length) setBulkSelected(new Set());
-                      else setBulkSelected(new Set(filtered.map(a=>a.athlete)));
+                      else setBulkSelected(new Set(filtered.map(a=>a.id)));
                     }} style={{ width:18, height:18, borderRadius:4, border:`2px solid ${bulkSelected.size>0?T:TX3}`,
                       background:bulkSelected.size===filtered.length?T:"transparent", display:"flex",
                       alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
@@ -2056,20 +2056,20 @@ function Athletes({ athletes, onSelect, onImport, bulkSelected, setBulkSelected,
             <tbody>
               {paged.map((a,i)=>(
                 <tr key={i} onClick={()=>{ if(!bulkMode) onSelect(a); }} style={{
-                  background: bulkSelected.has(a.athlete) ? T+"14" : i%2===0 ? "transparent" : C2+"88",
+                  background: bulkSelected.has(a.id) ? T+"14" : i%2===0 ? "transparent" : C2+"88",
                   cursor:"pointer", transition:"background 0.15s"
                 }}
-                onMouseEnter={e=>e.currentTarget.style.background=bulkSelected.has(a.athlete)?T+"22":T+"12"}
-                onMouseLeave={e=>e.currentTarget.style.background=bulkSelected.has(a.athlete)?T+"14":i%2===0?"transparent":C2+"88"}>
+                onMouseEnter={e=>e.currentTarget.style.background=bulkSelected.has(a.id)?T+"22":T+"12"}
+                onMouseLeave={e=>e.currentTarget.style.background=bulkSelected.has(a.id)?T+"14":i%2===0?"transparent":C2+"88"}>
                   {bulkMode && (
                     <td style={{ padding:"12px 8px", width:36 }} onClick={e=>{
                       e.stopPropagation();
-                      setBulkSelected(prev=>{const n=new Set(prev);n.has(a.athlete)?n.delete(a.athlete):n.add(a.athlete);return n;});
+                      setBulkSelected(prev=>{const n=new Set(prev);n.has(a.id)?n.delete(a.id):n.add(a.id);return n;});
                     }}>
-                      <div style={{ width:18, height:18, borderRadius:4, border:`2px solid ${bulkSelected.has(a.athlete)?T:TX3}`,
-                        background:bulkSelected.has(a.athlete)?T:"transparent", display:"flex",
+                      <div style={{ width:18, height:18, borderRadius:4, border:`2px solid ${bulkSelected.has(a.id)?T:TX3}`,
+                        background:bulkSelected.has(a.id)?T:"transparent", display:"flex",
                         alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
-                        {bulkSelected.has(a.athlete) && <span style={{color:"#0A0613",fontSize:11,fontWeight:800}}>✓</span>}
+                        {bulkSelected.has(a.id) && <span style={{color:"#0A0613",fontSize:11,fontWeight:800}}>✓</span>}
                       </div>
                     </td>
                   )}
@@ -2103,14 +2103,15 @@ function Athletes({ athletes, onSelect, onImport, bulkSelected, setBulkSelected,
             </div>
             <div style={{ display:"flex", gap:6 }}>
               <Btn size="sm" variant="ghost" onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1}>← Prev</Btn>
-              {Array.from({length:Math.min(5,pages)},(_,i)=>{
+              {[...new Set(Array.from({length:Math.min(5,pages)},(_,i)=>{
                 let p = page <= 3 ? i+1 : page >= pages-2 ? pages-4+i : page-2+i;
-                p = Math.max(1, Math.min(pages, p));
-                return <button key={p} onClick={()=>setPage(p)}
+                return Math.max(1, Math.min(pages, p));
+              }))].map(p =>
+                <button key={p} onClick={()=>setPage(p)}
                   style={{ width:32, height:32, borderRadius:6, border:`1px solid ${p===page?T+"66":BD}`,
                     background:p===page?T+"22":"transparent", color:p===page?T:TX2,
-                    cursor:"pointer", fontSize:12, fontFamily:"inherit" }}>{p}</button>;
-              })}
+                    cursor:"pointer", fontSize:12, fontFamily:"inherit" }}>{p}</button>
+              )}
               <Btn size="sm" variant="ghost" onClick={()=>setPage(p=>Math.min(pages,p+1))} disabled={page===pages}>Next →</Btn>
             </div>
           </div>
@@ -2691,16 +2692,16 @@ function Export({ athletes, contacts }) {
 }
 
 // ─── ACTIVITY / LOG ───────────────────────────────────────────────────────────
+const STATUS_TO_ACTION = {
+  "Contacted": "Email sent to", "Negotiating": "Negotiation started with",
+  "Proposal Sent": "Proposal sent to", "Closed Won": "Deal closed with",
+  "Closed Lost": "Status updated for", "Pending": "Contacted",
+};
 function Activity({ athletes, activityLog = [], onSelect }) {
-  const statusToAction = {
-    "Contacted": "Email sent to", "Negotiating": "Negotiation started with",
-    "Proposal Sent": "Proposal sent to", "Closed Won": "Deal closed with",
-    "Closed Lost": "Status updated for", "Pending": "Contacted",
-  };
 
   const log = useMemo(() => {
     return athletes.map((a, i) => ({
-      id: i, action: statusToAction[a.status] || "Contacted",
+      id: i, action: STATUS_TO_ACTION[a.status] || "Contacted",
       athlete: a.athlete || a.name, agency: a.agency, status: a.status,
       date: getContactedDate(i, athletes.length), email: a.email, _ref: a,
     })).sort((a, b) => b.date - a.date);
@@ -2989,8 +2990,10 @@ export default function App() {
     return { ...rest, name: athlete || row.name || "" };
   };
 
-  // Load from Supabase
+  // Load from Supabase (only after auth is resolved)
   useEffect(()=>{
+    if (authLoading) return;
+    if (!session) { setLoading(false); return; }
     (async()=>{
       try {
         const { data:ath } = await supabase.from("athletes").select("*");
@@ -3010,7 +3013,7 @@ export default function App() {
       }
       setLoading(false);
     })();
-  },[]);
+  },[authLoading, session]);
 
   const upd = useCallback(async updated => {
     const dbRow = toDB(updated);
@@ -3142,26 +3145,26 @@ export default function App() {
 
   const bulkDeleteAthletes = useCallback(async () => {
     if (!bulkSelected.size) return;
-    const toDelete = athletes.filter(a => bulkSelected.has(a.athlete));
+    const toDelete = athletes.filter(a => bulkSelected.has(a.id));
     for (const a of toDelete) {
       if (a.id) await supabase.from("athletes").delete().eq("id", a.id);
       else await supabase.from("athletes").delete().eq("name", a.athlete || a.name);
     }
-    setAthletes(prev => prev.filter(a => !bulkSelected.has(a.athlete)));
+    setAthletes(prev => prev.filter(a => !bulkSelected.has(a.id)));
     logActivity("Bulk deleted", `${toDelete.length} athletes`);
     setBulkSelected(new Set());
   }, [athletes, bulkSelected, logActivity]);
 
   const bulkUpdateStatus = useCallback(async (newStatus) => {
     if (!bulkSelected.size) return;
-    const toUpdate = athletes.filter(a => bulkSelected.has(a.athlete));
+    const toUpdate = athletes.filter(a => bulkSelected.has(a.id));
     for (const a of toUpdate) {
       const updated = { ...a, status: newStatus };
       const dbRow = toDB(updated);
       if (a.id) await supabase.from("athletes").update(dbRow).eq("id", a.id);
       else await supabase.from("athletes").update(dbRow).eq("name", dbRow.name);
     }
-    setAthletes(prev => prev.map(a => bulkSelected.has(a.athlete) ? { ...a, status: newStatus } : a));
+    setAthletes(prev => prev.map(a => bulkSelected.has(a.id) ? { ...a, status: newStatus } : a));
     logActivity("Bulk status update", `${toUpdate.length} athletes`, `Changed to ${newStatus}`);
     setBulkSelected(new Set());
   }, [athletes, bulkSelected, logActivity]);
