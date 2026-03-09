@@ -1291,16 +1291,17 @@ function GmailConnectModal({ onClose, onImport, defaultOwner="Carlos" }) {
       const addContact = (name, email) => {
         const em = email.toLowerCase().trim();
         if (!em || !em.includes("@")) return;
-        // Skip own email, team emails, and common no-reply addresses
         if (em === ownEmail) return;
-        if (/noreply|no-reply|no_reply|mailer-daemon|notifications@|alerts@|updates@|support@|info@|help@|admin@|billing@|newsletter|unsubscribe|do-not-reply|donotreply|feedback@|noreply|bounce|postmaster|webmaster|daemon|system@|automated|auto-reply|autoreply/.test(em)) return;
+        // Only skip truly automated/system addresses
+        if (/^noreply@|^no-reply@|^no_reply@|^mailer-daemon@|^postmaster@|^bounce|^daemon@|^do-not-reply@|^donotreply@|^auto-reply@|^autoreply@/.test(em)) return;
         if (!contactMap.has(em)) {
-          contactMap.set(em, { name: name || em.split("@")[0], email: em,
-            category: categorizeEmail(em, name || "", ""), source: "Gmail Sync", count: 1 });
+          const cleanName = (name && !name.includes("@") && name.trim().length > 1) ? name.trim() : "";
+          contactMap.set(em, { name: cleanName || em.split("@")[0].replace(/[._-]/g," ").replace(/\b\w/g,c=>c.toUpperCase()), email: em,
+            category: categorizeEmail(em, cleanName || "", ""), source: "Gmail Sync", count: 1 });
         } else {
           const existing = contactMap.get(em);
           existing.count++;
-          if (name && name.length > (existing.name || "").length && !name.includes("@")) existing.name = name;
+          if (name && name.trim().length > (existing.name || "").length && !name.includes("@")) existing.name = name.trim();
         }
       };
 
@@ -1333,62 +1334,52 @@ function GmailConnectModal({ onClose, onImport, defaultOwner="Carlos" }) {
         if (gotPeopleContacts) setProgress(12);
       } catch(_) { /* People API not available, continue with Gmail */ }
 
-      // 2. Fetch SENT messages (people you contacted)
-      let messages = [];
-      let pageToken = null;
-      let page = 0;
-      do {
-        const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=SENT&maxResults=500${pageToken ? `&pageToken=${pageToken}` : ""}`;
-        const listRes = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-        if (!listRes.ok) {
-          const errBody = await listRes.json().catch(() => ({}));
-          throw new Error(`Gmail API error ${listRes.status}: ${errBody.error?.message || listRes.statusText}`);
-        }
-        const listData = await listRes.json();
-        messages = messages.concat(listData.messages || []);
-        pageToken = listData.nextPageToken || null;
-        page++;
-        setProgress(Math.min(gotPeopleContacts ? 20 : 10, (gotPeopleContacts ? 12 : 5) + page * 2));
-      } while (pageToken && messages.length < 5000);
+      // 2. Fetch ALL messages (sent, received, CC'd — everything)
+      const fetchMessages = async (query, maxMsgs) => {
+        let msgs = [], pt = null, pg = 0;
+        do {
+          const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=500${pt ? `&pageToken=${pt}` : ""}`;
+          const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+          if (!res.ok) break;
+          const d = await res.json();
+          msgs = msgs.concat(d.messages || []);
+          pt = d.nextPageToken || null;
+          pg++;
+        } while (pt && msgs.length < maxMsgs);
+        return msgs;
+      };
 
-      // 3. Fetch INBOX messages (people who contacted you)
-      let inboxMsgs = [];
-      pageToken = null;
-      page = 0;
-      do {
-        const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=500${pageToken ? `&pageToken=${pageToken}` : ""}`;
-        const listRes = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-        if (!listRes.ok) break;
-        const listData = await listRes.json();
-        inboxMsgs = inboxMsgs.concat(listData.messages || []);
-        pageToken = listData.nextPageToken || null;
-        page++;
-        setProgress(Math.min(28, 20 + page * 2));
-      } while (pageToken && inboxMsgs.length < 3000);
+      setProgress(gotPeopleContacts ? 14 : 8);
+      const sentMsgs = await fetchMessages("in:sent", 8000);
+      setProgress(gotPeopleContacts ? 20 : 14);
+      const inboxMsgs = await fetchMessages("in:inbox", 8000);
+      setProgress(gotPeopleContacts ? 26 : 20);
+      // Also fetch from other labels (drafts replied to, important, etc.)
+      const otherMsgs = await fetchMessages("-in:sent -in:inbox", 3000);
+      setProgress(30);
 
       // Combine and deduplicate message IDs
       const allMsgIds = new Set();
       const allMessages = [];
-      [...messages, ...inboxMsgs].forEach(m => {
-        if (!allMsgIds.has(m.id)) { allMsgIds.add(m.id); allMessages.push(m); }
+      [...sentMsgs, ...inboxMsgs, ...otherMsgs].forEach(m => {
+        if (m && !allMsgIds.has(m.id)) { allMsgIds.add(m.id); allMessages.push(m); }
       });
-      setProgress(30);
 
-      // 4. Fetch headers in batches (From, To, Cc)
-      const batchSize = 40;
+      // 4. Fetch headers in batches (From, To, Cc, Bcc)
+      const batchSize = 50;
       const total = allMessages.length;
       for (let i = 0; i < total; i += batchSize) {
         const batch = allMessages.slice(i, i + batchSize);
         await Promise.all(batch.map(async msg => {
           try {
             const r = await fetch(
-              `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc`,
+              `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc&metadataHeaders=Bcc&metadataHeaders=Reply-To`,
               { headers: { Authorization: `Bearer ${accessToken}` } }
             );
             if (!r.ok) return;
             const data = await r.json();
             const headers = data.payload?.headers || [];
-            ["From", "To", "Cc"].forEach(hName => {
+            ["From", "To", "Cc", "Bcc", "Reply-To"].forEach(hName => {
               const h = headers.find(x => x.name === hName);
               if (!h) return;
               parseEmailAddresses(h.value).forEach(({ name, email }) => addContact(name, email));
