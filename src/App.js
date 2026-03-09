@@ -2933,6 +2933,34 @@ function LoginScreen({ onAuth }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [linkSent, setLinkSent] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
+
+  const sendLink = async (em) => {
+    if (cooldown > 0) return;
+    setLoading(true);
+    setError("");
+    try {
+      const { error: otpErr } = await supabase.auth.signInWithOtp({
+        email: em,
+        options: { emailRedirectTo: window.location.origin }
+      });
+      if (otpErr) {
+        const msg = otpErr.message.toLowerCase().includes("rate limit")
+          ? "Please wait a moment before requesting another link."
+          : otpErr.message;
+        setError(msg); setCooldown(60); setLoading(false); return;
+      }
+      setLinkSent(true);
+      setCooldown(60);
+    } catch { setError("Something went wrong. Try again."); }
+    setLoading(false);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -2942,21 +2970,7 @@ function LoginScreen({ onAuth }) {
       setError("Access denied. This email is not authorized.");
       return;
     }
-    setLoading(true);
-    try {
-      const { error: otpErr } = await supabase.auth.signInWithOtp({
-        email: em,
-        options: { emailRedirectTo: window.location.origin }
-      });
-      if (otpErr) {
-        const msg = otpErr.message.toLowerCase().includes("rate limit")
-          ? "Too many attempts. Please wait a minute and try again."
-          : otpErr.message;
-        setError(msg); setLoading(false); return;
-      }
-      setLinkSent(true);
-    } catch { setError("Something went wrong. Try again."); }
-    setLoading(false);
+    await sendLink(em);
   };
 
   return (
@@ -3020,14 +3034,21 @@ function LoginScreen({ onAuth }) {
             <div style={{ textAlign:"center" }}>
               <div style={{ fontSize:48, marginBottom:16 }}>✉️</div>
               <h2 style={{ margin:"0 0 8px", color:TX1, fontSize:20, fontWeight:800 }}>Check your inbox</h2>
-              <p style={{ margin:"0 0 24px", color:TX2, fontSize:13, lineHeight:1.6 }}>
+              <p style={{ margin:"0 0 20px", color:TX2, fontSize:13, lineHeight:1.6 }}>
                 We sent a login link to<br/>
                 <span style={{ color:T, fontWeight:600 }}>{email.toLowerCase().trim()}</span>
               </p>
-              <p style={{ margin:"0 0 24px", color:TX3, fontSize:12 }}>
-                Click the link in the email to sign in. It may take a moment to arrive.
+              <p style={{ margin:"0 0 20px", color:TX3, fontSize:12 }}>
+                Click the link in the email to sign in. Check spam if you don't see it.
               </p>
-              <button onClick={()=>{ setLinkSent(false); setError(""); }}
+              <button onClick={()=>sendLink(email.toLowerCase().trim())} disabled={cooldown > 0 || loading}
+                style={{ width:"100%", padding:"11px 0", borderRadius:10, border:`1px solid ${cooldown>0?BD:T+"66"}`,
+                  background: cooldown>0 ? "transparent" : T+"18", color: cooldown>0 ? TX3 : T,
+                  fontSize:13, fontWeight:600, fontFamily:"inherit", cursor: cooldown>0?"default":"pointer",
+                  marginBottom:14, transition:"all 0.2s" }}>
+                {loading ? "Sending..." : cooldown > 0 ? `Resend link (${cooldown}s)` : "Resend login link"}
+              </button>
+              <button onClick={()=>{ setLinkSent(false); setError(""); setCooldown(0); }}
                 style={{ background:"none", border:"none", color:T, fontSize:13, cursor:"pointer",
                   fontFamily:"inherit", fontWeight:500, opacity:0.8, transition:"opacity 0.2s" }}
                 onMouseEnter={e=>e.target.style.opacity=1} onMouseLeave={e=>e.target.style.opacity=0.8}>
