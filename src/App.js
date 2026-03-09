@@ -1434,13 +1434,13 @@ function GmailConnectModal({ onClose, onImport, defaultOwner="Carlos" }) {
       const { data: existingCon } = await supabase.from("contacts").select("email");
       if (existingCon) existingCon.forEach(c => { if (c.email) existingEmails.add(c.email.toLowerCase().trim()); });
       setProgress(10);
-      // Only send columns that exist in the DB: name, company, category, email, phone
       const mapped = toImport.map(r => ({
         name: r.name || r.athlete || "",
         company: r.company || r.agency || "",
         category: r.category || categorizeEmail(r.email || "", r.name || "", r.company || ""),
         email: r.email || "",
-        phone: r.phone || ""
+        phone: r.phone || "",
+        owner: syncOwner
       })).filter(r => (r.name || r.email) && !existingEmails.has((r.email || "").toLowerCase().trim()));
       if (!mapped.length) { setStep(3); return; }
       const CHUNK = 50;
@@ -1468,7 +1468,7 @@ function GmailConnectModal({ onClose, onImport, defaultOwner="Carlos" }) {
       const { data: freshCon } = await supabase.from("contacts").select("*");
       if (freshCon) {
         const refreshed = freshCon.map(c => ({
-          ...c, athlete: c.name || "", owner: syncOwner,
+          ...c, athlete: c.name || "", owner: c.owner || syncOwner,
           category: CONTACT_CATS.includes(c.category) ? c.category : categorizeEmail(c.email || "", c.name || "", c.company || "")
         }));
         onImport(refreshed, "refresh");
@@ -3315,7 +3315,7 @@ export default function App() {
             const catOk = CONTACT_CATS.includes(current);
             const newCat = catOk ? current : categorizeEmail(c.email || "", c.name || "", c.company || "");
             if (!catOk) needsCatFix.push({ id: c.id, category: newCat });
-            return { ...c, athlete: c.name || "", owner: "Carlos", category: newCat };
+            return { ...c, athlete: c.name || "", owner: c.owner || "Carlos", category: newCat };
           });
           setContacts(mapped);
           // Fix categories in Supabase for contacts that have invalid categories (once per session)
@@ -3379,7 +3379,8 @@ export default function App() {
         company: form.agency || form.company || "",
         category: form.category || categorizeEmail(form.email || "", form.name || form.athlete || "", form.company || form.agency || ""),
         email: form.email || "",
-        phone: form.phone || ""
+        phone: form.phone || "",
+        owner: currentUser
       };
       const { data } = await supabase.from("contacts").insert([dbRow]).select();
       if(data?.length) setContacts(prev=>[{ ...data[0], athlete: data[0].name, owner: currentUser },...prev]);
@@ -3416,11 +3417,11 @@ export default function App() {
       logActivity("Imported athletes", `${toImport.length} records`, `${dupes.length} duplicates skipped`);
     } else {
       const existingEmails = new Set(contacts.map(c => (c.email||"").toLowerCase().trim()));
-      const ownerForState = currentUser; // owner tracked client-side only (not in DB)
+      const ownerForImport = currentUser;
       const mapped = rows.map(r=>({
         name:r.name||r.athlete||"",company:r.company||r.agency||"",
         category:r.category||categorizeEmail(r.email||"",r.name||r.athlete||"",r.company||r.agency||""),
-        email:r.email||"",phone:r.phone||""
+        email:r.email||"",phone:r.phone||"",owner:ownerForImport
       })).filter(r=>r.name||r.email);
       const dupes = mapped.filter(r => existingEmails.has((r.email||"").toLowerCase().trim()));
       let toImport = mapped;
@@ -3432,7 +3433,7 @@ export default function App() {
       const CHUNK=50;
       for(let i=0;i<toImport.length;i+=CHUNK) {
         const { data } = await supabase.from("contacts").insert(toImport.slice(i,i+CHUNK)).select();
-        if(data) setContacts(prev=>[...data.map(c=>({...c, athlete:c.name, owner:ownerForState})),...prev]);
+        if(data) setContacts(prev=>[...data.map(c=>({...c, athlete:c.name, owner:c.owner||ownerForImport})),...prev]);
       }
       logActivity("Imported contacts", `${toImport.length} records`);
     }
@@ -3442,7 +3443,7 @@ export default function App() {
     if (updated.id) {
       await supabase.from("contacts").update({
         name: updated.name, company: updated.company, category: updated.category,
-        email: updated.email, phone: updated.phone
+        email: updated.email, phone: updated.phone, owner: updated.owner
       }).eq("id", updated.id);
     }
     setContacts(prev=>prev.map(c=>c.id===updated.id ? { ...updated, athlete: updated.name } : c));
@@ -3515,17 +3516,18 @@ export default function App() {
     const toDelete = contacts.filter(c => (c.owner || "Carlos") === member);
     if (!toDelete.length || !window.confirm(`Delete all ${toDelete.length} contacts for ${member}? This cannot be undone.`)) return;
     try {
-      // Delete by ID (owner column doesn't exist in Supabase, so delete by actual IDs)
-      const ids = toDelete.map(c => c.id).filter(Boolean);
-      let deleted = 0;
-      for (let i = 0; i < ids.length; i += 50) {
-        const batch = ids.slice(i, i + 50);
-        const { error } = await supabase.from("contacts").delete().in("id", batch);
-        if (error) console.error("Batch delete error:", error.message);
-        else deleted += batch.length;
+      // Delete by owner column in Supabase + fallback to ID batches
+      const { error: ownerErr } = await supabase.from("contacts").delete().eq("owner", member);
+      if (ownerErr) {
+        // Fallback: delete by ID batches
+        const ids = toDelete.map(c => c.id).filter(Boolean);
+        for (let i = 0; i < ids.length; i += 50) {
+          const batch = ids.slice(i, i + 50);
+          await supabase.from("contacts").delete().in("id", batch);
+        }
       }
       setContacts(prev => prev.filter(c => (c.owner || "Carlos") !== member));
-      logActivity("Cleared contacts", `${deleted} contacts for ${member}`);
+      logActivity("Cleared contacts", `${toDelete.length} contacts for ${member}`);
     } catch (err) {
       alert(`Error clearing contacts: ${err.message}`);
     }
@@ -3571,10 +3573,10 @@ export default function App() {
             if (prev.some(c => c.id === payload.new.id)) return prev;
             const cat = CONTACT_CATS.includes(payload.new.category) ? payload.new.category
               : categorizeEmail(payload.new.email||"", payload.new.name||"", payload.new.company||"");
-            return [{ ...payload.new, athlete: payload.new.name, owner: "Carlos", category: cat }, ...prev];
+            return [{ ...payload.new, athlete: payload.new.name, owner: payload.new.owner || "Carlos", category: cat }, ...prev];
           });
         } else if (payload.eventType === "UPDATE" && payload.new) {
-          setContacts(prev => prev.map(c => c.id === payload.new.id ? { ...payload.new, athlete: payload.new.name, owner: c.owner || "Carlos" } : c));
+          setContacts(prev => prev.map(c => c.id === payload.new.id ? { ...payload.new, athlete: payload.new.name, owner: payload.new.owner || c.owner || "Carlos" } : c));
         } else if (payload.eventType === "DELETE" && payload.old) {
           setContacts(prev => prev.filter(c => c.id !== payload.old.id));
         }
