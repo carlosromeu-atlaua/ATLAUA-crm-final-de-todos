@@ -769,50 +769,53 @@ function categorizeEmail(email, name, company) {
   const domain = (email.split("@")[1] || "").toLowerCase();
   const text = `${domain} ${(name||"").toLowerCase()} ${(company||"").toLowerCase()}`;
 
-  // Internal Network — @atlaua.de team emails, freelancers, agencies, consultants, service providers
+  // ── INTERNAL NETWORK ── @atlaua.de, agencies, freelancers, service providers
   if (domain.includes("atlaua")) return "Internal Network";
+  if (/agency|agentur|kreativ|design.?agentur|werbeagentur|freelanc/.test(text)) return "Internal Network";
+  if (/\broc\b|wasserman|klutch|rosenhaus|wme|vayner|\bimg\b|boras|endeavor|sportstrust|steinberg|athletes.?first|octagon|creative.?artist|united.?talent|gpg|disruptive|paraphe|net.?sport|goal.?line|uasport|delta.?sport|intersport|global.?sport|hof.?player/.test(text)) return "Internal Network";
 
-  // Internal Network — talent/sports agencies, creative agencies, service providers
-  if (/\broc\b|caa|wasserman|klutch|rosenhaus|wme|vayner|\bimg\b|boras|endeavor|sportstrust|steinberg|athletes.?first|octagon|creative.?artist|united.?talent|gpg|disruptive|paraphe|net.?sport|goal.?line|uasport|delta.?sport|intersport|global.?sport|hof.?player|agency|agentur/.test(text)) return "Internal Network";
+  // ── INVESTORS & CAPITAL ── VCs, angels, family offices, banks, funds
+  if (/invest|venture|capital|\bfund\b|angel|\bvc\b|equity|holdings|fintech|private.?equity|seed|series.?[abc]|family.?office|portfolio|sequoia|andressen|a16z|accel|greylock|kleiner|benchmark|tiger.?global|softbank|goldman|jpmorgan|morgan.?stanley|blackrock|citadel|bridgewater|kkr|carlyle|bain.?capital/.test(text)) return "Investors & Capital";
 
-  // Investors & Capital — VCs, angels, family offices, strategic investors
-  if (/invest|venture|capital|\bfund\b|angel|\bvc\b|equity|holdings|fintech|private.?equity|seed|series.?[abc]|family.?office|portfolio/.test(text)) return "Investors & Capital";
+  // ── MEDIA & PRESS ── outlets, journalists, podcasts, content
+  if (/espn|nbc|cbs|fox|bleacher|athletic|si\.com|reuters|bloomberg|forbes|cnbc|\bwsj\b|techcrunch|vox|vice|huffpost|buzzfeed|mashable|complex|highsnobiety|hypebeast|gq\b|esquire|mens.?health|womens.?health|runner|self\.com|shape\.com|outside\.com|media|press|journal|times|news|broadcast|podcast|magazine|editorial|reporter|writer|blog|\btv\b|radio|streaming|content.?creator|influencer.?market|pr\b|public.?relation|kommunikation|prensa|redacc/.test(text)) return "Media & Press";
 
-  // Athletes & Ambassadors — pros, rising athletes, influencers, ambassadors
-  if (/athlete|player|ambassador|influencer|talent|champion|olymp|draft|prospect|fitness.?model|brand.?face/.test(text)) return "Athletes & Ambassadors";
+  // ── ATHLETES & AMBASSADORS ── athletes, influencers, talent, sports figures
+  if (/athlete|player|ambassador|influencer|talent|champion|olymp|draft|prospect|fitness.?model|brand.?face|sportler|deportista/.test(text)) return "Athletes & Ambassadors";
 
-  // Media & Press — journalists, podcasts, sports media, wellness media, content creators
-  if (/espn|nbc|cbs|fox|bleacher|athletic|si\.com|media|press|journal|times|news|broadcast|podcast|magazine|editorial|reporter|writer|blog|\btv\b|radio|streaming|content.?creator|influencer.?market/.test(text)) return "Media & Press";
+  // ── STRATEGIC PARTNERS ── leagues, sports orgs, wellness, tech, events, brands with partnership potential
+  if (/partner|collab|alliance|sponsor|foundation|\bngo\b|charity|assoc|federation|league|union|co.?brand|joint.?venture|baller.?league|converge|wellness|hospitality|festival/.test(text)) return "Strategic Partners";
+  if (/nfl\.com|nba\.com|nhl\.com|mlb\.com|mls|fifa|uefa|laliga|bundesliga|premierleague|seahawks|dolphins|lakers|celtics|yankees|cowboys|chiefs|bulls|heat|mavs|knicks|warriors|bruins|leafs|canucks|rangers|cubs|astros|redsox|equinox|crossfit|soulcycle|peloton|orangetheory|barry.?boot/.test(text)) return "Strategic Partners";
 
-  // Manufacturing & Production — co-packers, bottling, labs, formulation, packaging, quality
-  if (/manufactur|produc|factory|bottl|co.?pack|private.?label|formul|\blab\b|quality.?control|\bgmp\b|\bfda\b|packag|assembl|fabric|textile|garment|sew|embroid|screen.?print|prototype/.test(text)) return "Manufacturing & Production";
+  // ── MANUFACTURING & PRODUCTION ── co-packers, bottling, labs, packaging, formulation
+  if (/manufactur|produc|factory|bottl|co.?pack|private.?label|formul|\blab\b|quality.?control|\bgmp\b|\bfda\b|packag|assembl|fabric|textile|garment|sew|embroid|screen.?print|prototype|drinkworks|beverage.?dev|flavor|recipe|r.?&.?d\b|batch|ferment|pasteur|aseptic|tetrapak|tetra.?pak|crown.?hold|ball.?corp|ardagh|amcor/.test(text)) return "Manufacturing & Production";
 
-  // Suppliers — ingredients, bottles, labels, caps, CBD, electrolyte, raw materials
-  if (/suppli|vendor|procure|raw.?material|ingredient|electrolyte|\bcbd\b|functional.?ingredient|bottle.?suppli|label.?suppli|cap.?suppli|closure|secondary.?packag/.test(text)) return "Suppliers";
+  // ── SUPPLIERS ── ingredients, bottles, labels, caps, raw materials
+  if (/suppli|vendor|procure|raw.?material|ingredient|electrolyte|\bcbd\b|functional.?ingredient|bottle.?suppli|label.?suppli|cap.?suppli|closure|secondary.?packag|flavor.?house|givaudan|firmenich|symrise|dsm|basf|cargill|adm\b|tate.?lyle|sweetener|preserv|coloring|additive/.test(text)) return "Suppliers";
 
-  // Logistics & Fulfillment — freight, warehousing, fulfillment, cold chain, customs
-  if (/logistic|fulfil|shipping|freight|warehouse|delivery|courier|\bdhl\b|\bfedex\b|\bups\b|3pl|dispatch|transport|cargo|cold.?chain|import.?export|customs.?broker/.test(text)) return "Logistics & Fulfillment";
+  // ── LOGISTICS & FULFILLMENT ── freight, warehousing, 3PL, cold chain, customs
+  if (/logistic|fulfil|shipping|freight|warehouse|delivery|courier|\bdhl\b|\bfedex\b|\bups\b|3pl|dispatch|transport|cargo|cold.?chain|import.?export|customs.?broker|maersk|kuehne|db.?schenk|xpo|flexport|shipbob|deliverr|amazon.?fba/.test(text)) return "Logistics & Fulfillment";
 
-  // Retail & Distribution — premium retail, gyms, health stores, hotels, bars, distributors, importers
-  if (/retail|distribut|wholesale|\bstore\b|\bshop\b|ecommerce|marketplace|boutique|resell|stockist|\bgym\b|fitness.?chain|health.?store|hotel|beach.?club|\bbar\b|importer/.test(text)) return "Retail & Distribution";
+  // ── RETAIL & DISTRIBUTION ── stores, gyms, hotels, distributors, e-commerce
+  if (/retail|distribut|wholesale|\bstore\b|ecommerce|marketplace|boutique|resell|stockist|fitness.?chain|health.?store|hotel|beach.?club|importer|whole.?foods|target|walmart|costco|kroger|trader.?joe|sprouts|publix|safeway|cvs|walgreen|rite.?aid|\bgym\b|gnc|vitamin.?shoppe|amazon|shopify|ebay/.test(text)) return "Retail & Distribution";
 
-  // Advisors & Mentors — business, legal, regulatory, industry experts
-  if (/advisor|consult|counsel|mentor|legal|\blaw\b|attorney|account|audit|regulat|\bcfo\b|\bcto\b|board|expert/.test(text)) return "Advisors & Mentors";
+  // ── ADVISORS & MENTORS ── business, legal, regulatory, accounting
+  if (/advisor|consult|counsel|mentor|legal|\blaw\b|attorney|account|audit|regulat|\bcfo\b|\bcto\b|board|expert|steuerber|rechtsanw|abogad|kanzlei|deloitte|pwc|kpmg|ernst.?young|\bey\b|mckinsey|\bbcg\b|baker.?mckenzie|latham|skadden/.test(text)) return "Advisors & Mentors";
 
-  // Strategic Partners — sports leagues, gyms, wellness, hospitality, events, tech
-  if (/partner|collab|alliance|sponsor|foundation|\bngo\b|charity|assoc|federation|league|union|co.?brand|joint.?venture|baller.?league|converge.?labs|wellness|hospitality|festival/.test(text)) return "Strategic Partners";
-
-  // Community & Club Members — club tiers, supporters, founding members
+  // ── COMMUNITY & CLUB MEMBERS ── supporters, members, fans
   if (/club|community|member|fan|supporter|youth|academy|grassroot|volunteer|founding|vip|elyte/.test(text)) return "Community & Club Members";
 
-  // Sports teams — categorize as Strategic Partners
-  if (/nfl\.com|nba\.com|nhl\.com|mlb\.com|seahawks|dolphins|lakers|celtics|yankees|cowboys|chiefs|bulls|heat|mavs|knicks|warriors/.test(domain)) return "Strategic Partners";
+  // ── KNOWN BRANDS (→ Strategic Partners) ── major brands from sports, beverage, lifestyle
+  if (/nike|adidas|puma|under.?armour|new.?balance|reebok|asics|lululemon|gymshark|fabletics|alo.?yoga|vuori|on.?running|hoka|salomon|north.?face|patagonia/.test(text)) return "Strategic Partners";
+  if (/coca.?cola|pepsi|red.?bull|monster|gatorade|powerade|prime|celsius|bang|reign|bodyarmor|liquid.?death|hint|bai|vitaminwater|lacroix|topo.?chico|nescafe|starbucks|nestle/.test(text)) return "Strategic Partners";
 
-  // Free email domains → Other
-  if (/gmail|yahoo|hotmail|outlook|icloud|proton|aol|live\.com|msn/.test(domain)) return "Other";
+  // ── Free email domains → Other (personal emails)
+  if (/gmail\.com|yahoo\.|hotmail\.|outlook\.|icloud\.|proton|aol\.|live\.com|msn\.com|me\.com|mail\.com|gmx\.|web\.de|t-online|freenet|posteo/.test(domain)) return "Other";
 
-  // Default — unknown business domains
-  return "Other";
+  // ── Default for BUSINESS domains → Strategic Partners (not "Other")
+  // Real company domains that didn't match any specific pattern are likely
+  // business contacts worth categorizing as potential partners
+  return "Strategic Partners";
 }
 
 function formatDate(dateStr) {
@@ -2472,7 +2475,7 @@ function ContactPanel({ contact, onClose, onSave }) {
 }
 
 // ─── CONTACTS (Grouped) ───────────────────────────────────────────────────────
-function Contacts({ contacts, onImport, onUpdateContact, onClearMember }) {
+function Contacts({ contacts, onImport, onUpdateContact, onClearMember, onBulkCategoryChange }) {
   const [q, setQ]         = useState("");
   const [showImport, setShowImport]   = useState(false);
   const [showGmail, setShowGmail]     = useState(false);
@@ -2480,6 +2483,8 @@ function Contacts({ contacts, onImport, onUpdateContact, onClearMember }) {
   const [filterCat, setFilterCat]     = useState("All");
   const [filterOwner, setFilterOwner] = useState("All");
   const [editContact, setEditContact] = useState(null);
+  const [bulkMode, setBulkMode]       = useState(false);
+  const [bulkSelected, setBulkSelected] = useState(new Set());
 
   const cats = CONTACT_CATS;
   const filtered = useMemo(()=>contacts.filter(c=>
@@ -2512,6 +2517,10 @@ function Contacts({ contacts, onImport, onUpdateContact, onClearMember }) {
       <SectionHeader title="Contacts"
         sub={`${filtered.length} contacts${filterOwner!=="All"?` assigned to ${filterOwner}`:""}`}
         right={<>
+          <Btn variant={bulkMode?"outline":"ghost"} size="sm" onClick={()=>{setBulkMode(b=>!b);setBulkSelected(new Set());}}
+            style={bulkMode?{background:T+"22",color:T,border:`1px solid ${T}44`}:{}}>
+            {bulkMode?"Exit Bulk":"Bulk Edit"}
+          </Btn>
           <Btn size="sm" variant="ghost" onClick={()=>setShowImport(true)} icon="↑">Import CSV</Btn>
           <Btn size="sm" onClick={()=>setShowGmail(true)}
             style={{ background:`linear-gradient(135deg,#4285F4,#34A853)`, color:"#fff", boxShadow:"0 4px 14px rgba(66,133,244,0.25)", borderRadius:10 }}>
@@ -2560,11 +2569,25 @@ function Contacts({ contacts, onImport, onUpdateContact, onClearMember }) {
         )}
       </div>
 
-      <div style={{ display:"flex", gap:10, marginBottom:20, flexWrap:"wrap" }}>
+      <div style={{ display:"flex", gap:10, marginBottom: bulkMode && bulkSelected.size > 0 ? 8 : 20, flexWrap:"wrap" }}>
         <SearchInput value={q} onChange={setQ} placeholder="Search contacts..." style={{flex:1,minWidth:200}}/>
         <Select value={filterCat} onChange={setFilterCat}
           options={["All",...cats].map(c=>({value:c,label:c==="All"?"All Categories":c}))}/>
       </div>
+
+      {/* Bulk Actions Bar */}
+      {bulkMode && (
+        <div style={{ display:"flex", gap:8, marginBottom:16, flexWrap:"wrap", alignItems:"center",
+          padding:"10px 16px", background:T+"12", borderRadius:12, border:`1px solid ${T}33` }}>
+          <Btn size="sm" variant="ghost" onClick={()=>setBulkSelected(new Set(filtered.map(c=>c.id)))}>Select All ({filtered.length})</Btn>
+          <Btn size="sm" variant="ghost" onClick={()=>setBulkSelected(new Set())}>Deselect All</Btn>
+          <Tag label={`${bulkSelected.size} selected`} color={T}/>
+          {bulkSelected.size > 0 && (
+            <Select value="" onChange={v=>{if(v) onBulkCategoryChange([...bulkSelected], v); setBulkSelected(new Set());}}
+              options={[{value:"",label:"Move to category..."},...cats.map(c=>({value:c,label:c}))]}/>
+          )}
+        </div>
+      )}
 
       {cats.filter(cat=>grouped[cat]?.length).map(cat=>(
         <div key={cat} style={{ marginBottom:14 }}>
@@ -2585,6 +2608,18 @@ function Contacts({ contacts, onImport, onUpdateContact, onClearMember }) {
               <table style={{ width:"100%", borderCollapse:"collapse" }}>
                 <thead>
                   <tr style={{ background:C2+"88" }}>
+                    {bulkMode && <th style={{ padding:"9px 8px 9px 16px", borderBottom:`1px solid ${BD}`, width:36 }}>
+                      <div onClick={()=>{
+                        const catIds = grouped[cat].map(c=>c.id).filter(Boolean);
+                        const allSelected = catIds.every(id=>bulkSelected.has(id));
+                        if(allSelected) setBulkSelected(prev=>{const n=new Set(prev);catIds.forEach(id=>n.delete(id));return n;});
+                        else setBulkSelected(prev=>{const n=new Set(prev);catIds.forEach(id=>n.add(id));return n;});
+                      }} style={{ width:18, height:18, borderRadius:4, border:`2px solid ${bulkSelected.size>0?T:TX3}`,
+                        background:grouped[cat].every(c=>bulkSelected.has(c.id))?T:"transparent", display:"flex",
+                        alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
+                        {grouped[cat].every(c=>bulkSelected.has(c.id)) && <span style={{color:"#0A0613",fontSize:11,fontWeight:800}}>✓</span>}
+                      </div>
+                    </th>}
                     {["Name","Company / Email","Owner","Category","Actions"].map(h=>(
                       <th key={h} style={{ padding:"9px 16px", color:TX3, fontSize:11, fontWeight:700,
                         letterSpacing:"0.07em", textTransform:"uppercase", textAlign:"left",
@@ -2594,9 +2629,22 @@ function Contacts({ contacts, onImport, onUpdateContact, onClearMember }) {
                 </thead>
                 <tbody>
                   {grouped[cat].map((c,i)=>(
-                    <tr key={c.id||i} onClick={()=>setEditContact(c)} style={{ background:i%2===0?"transparent":C2+"55", cursor:"pointer", transition:"background 0.15s" }}
-                      onMouseEnter={e=>e.currentTarget.style.background=T+"12"}
-                      onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"transparent":C2+"55"}>
+                    <tr key={c.id||i} onClick={()=>{ if(!bulkMode) setEditContact(c); }}
+                      style={{ background: bulkSelected.has(c.id) ? T+"14" : i%2===0?"transparent":C2+"55", cursor:"pointer", transition:"background 0.15s" }}
+                      onMouseEnter={e=>e.currentTarget.style.background=bulkSelected.has(c.id)?T+"22":T+"12"}
+                      onMouseLeave={e=>e.currentTarget.style.background=bulkSelected.has(c.id)?T+"14":i%2===0?"transparent":C2+"55"}>
+                      {bulkMode && (
+                        <td style={{ padding:"11px 8px 11px 16px", width:36 }} onClick={e=>{
+                          e.stopPropagation();
+                          setBulkSelected(prev=>{const n=new Set(prev);n.has(c.id)?n.delete(c.id):n.add(c.id);return n;});
+                        }}>
+                          <div style={{ width:18, height:18, borderRadius:4, border:`2px solid ${bulkSelected.has(c.id)?T:TX3}`,
+                            background:bulkSelected.has(c.id)?T:"transparent", display:"flex",
+                            alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
+                            {bulkSelected.has(c.id) && <span style={{color:"#0A0613",fontSize:11,fontWeight:800}}>✓</span>}
+                          </div>
+                        </td>
+                      )}
                       <td style={{ padding:"11px 16px", color:TX1, fontSize:14, fontWeight:700 }}>{c.name}</td>
                       <td style={{ padding:"11px 16px" }}>
                         <div style={{ color:TX2, fontSize:12 }}>{c.company||""}</div>
@@ -3232,6 +3280,15 @@ export default function App() {
     logActivity("Cleared contacts", `All ${count} contacts for ${member}`);
   }, [contacts, logActivity]);
 
+  const bulkCategoryChange = useCallback(async (ids, newCategory) => {
+    if (!ids.length) return;
+    for (const id of ids) {
+      await supabase.from("contacts").update({ category: newCategory }).eq("id", id);
+    }
+    setContacts(prev => prev.map(c => ids.includes(c.id) ? { ...c, category: newCategory } : c));
+    logActivity("Bulk category change", `${ids.length} contacts`, `Moved to ${newCategory}`);
+  }, [logActivity]);
+
   // ─── GLOBAL SEARCH FILTERING ───────────────────────────────────────────────
   const globalFiltered = useMemo(() => {
     if (!globalQ.trim()) return { athletes, contacts };
@@ -3514,7 +3571,7 @@ export default function App() {
           {page==="Agencies"  && <Agencies  athletes={globalFiltered.athletes} onSelect={setSel}/>}
           {page==="Teams"     && <Teams     athletes={globalFiltered.athletes} onSelect={setSel}/>}
           {page==="Pipeline"  && <Pipeline  athletes={globalFiltered.athletes} onUpdate={upd} onSelect={setSel}/>}
-          {page==="Contacts"  && <Contacts  contacts={globalFiltered.contacts} onImport={importBatch} onUpdateContact={updContact} onClearMember={clearMemberContacts}/>}
+          {page==="Contacts"  && <Contacts  contacts={globalFiltered.contacts} onImport={importBatch} onUpdateContact={updContact} onClearMember={clearMemberContacts} onBulkCategoryChange={bulkCategoryChange}/>}
           {page==="Activity"  && <Activity  athletes={athletes} activityLog={activityLog} onSelect={setSel}/>}
           {page==="Export"    && <Export    athletes={globalFiltered.athletes} contacts={globalFiltered.contacts}/>}
         </main>
