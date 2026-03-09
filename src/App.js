@@ -768,53 +768,60 @@ const CONTACT_CATS = [
 function categorizeEmail(email, name, company) {
   const domain = (email.split("@")[1] || "").toLowerCase();
   const text = `${domain} ${(name||"").toLowerCase()} ${(company||"").toLowerCase()}`;
+  const domBase = domain.split(".")[0] || "";
 
-  // ── INTERNAL NETWORK ── @atlaua.de, agencies, freelancers, service providers
+  // ── FREE EMAIL → Other (personal emails, can't auto-categorize)
+  if (/gmail\.com|yahoo\.|hotmail\.|outlook\.|icloud\.|proton|aol\.|live\.com|msn\.com|me\.com|mail\.com|gmx\.|web\.de|t-online|freenet|posteo|ymail|rocketmail|zoho/.test(domain)) return "Other";
+
+  // ── INTERNAL NETWORK ── @atlaua.de, agencies, freelancers, service providers, consultants
   if (domain.includes("atlaua")) return "Internal Network";
-  if (/agency|agentur|kreativ|design.?agentur|werbeagentur|freelanc/.test(text)) return "Internal Network";
-  if (/\broc\b|wasserman|klutch|rosenhaus|wme|vayner|\bimg\b|boras|endeavor|sportstrust|steinberg|athletes.?first|octagon|creative.?artist|united.?talent|gpg|disruptive|paraphe|net.?sport|goal.?line|uasport|delta.?sport|intersport|global.?sport|hof.?player/.test(text)) return "Internal Network";
+  if (/agency|agentur|kreativ|werbeagentur|freelanc|fiverr|upwork|toptal|99design/.test(text)) return "Internal Network";
+  if (/wasserman|klutch|rosenhaus|wme|vayner|\bimg\b|boras|endeavor|sportstrust|steinberg|athletes.?first|octagon|creative.?artist|united.?talent|gpg|disruptive|paraphe|net.?sport|goal.?line|uasport|delta.?sport|intersport|global.?sport|hof.?player/.test(text)) return "Internal Network";
 
   // ── INVESTORS & CAPITAL ── VCs, angels, family offices, banks, funds
-  if (/invest|venture|capital|\bfund\b|angel|\bvc\b|equity|holdings|fintech|private.?equity|seed|series.?[abc]|family.?office|portfolio|sequoia|andressen|a16z|accel|greylock|kleiner|benchmark|tiger.?global|softbank|goldman|jpmorgan|morgan.?stanley|blackrock|citadel|bridgewater|kkr|carlyle|bain.?capital/.test(text)) return "Investors & Capital";
+  if (/invest|venture|capital|\bfund|angel|\bvc\b|equity|holdings|fintech|private.?equity|seed\b|family.?office|portfolio|sequoia|andreessen|a16z|accel|greylock|kleiner|benchmark|tiger.?global|softbank|goldman|jpmorgan|morgan.?stanley|blackrock|citadel|bridgewater|kkr|carlyle|bain.?capital|ribbit|thrive|founders.?fund|khosla|lightspeed|general.?catalyst|index.?ventures|insight.?partner|bessemer|canaan|battery.?venture|spark.?capital|union.?square|first.?round|lerer|maveron|felicis|initialized|techstars|ycombinator|500.?startup|antler|plug.?and.?play/.test(text)) return "Investors & Capital";
 
-  // ── MEDIA & PRESS ── outlets, journalists, podcasts, content
-  if (/espn|nbc|cbs|fox|bleacher|athletic|si\.com|reuters|bloomberg|forbes|cnbc|\bwsj\b|techcrunch|vox|vice|huffpost|buzzfeed|mashable|complex|highsnobiety|hypebeast|gq\b|esquire|mens.?health|womens.?health|runner|self\.com|shape\.com|outside\.com|media|press|journal|times|news|broadcast|podcast|magazine|editorial|reporter|writer|blog|\btv\b|radio|streaming|content.?creator|influencer.?market|pr\b|public.?relation|kommunikation|prensa|redacc/.test(text)) return "Media & Press";
+  // ── MEDIA & PRESS ── outlets, journalists, podcasts, content, PR
+  if (/espn|nbc|cbs|fox|bleacher|athletic|si\.com|reuters|bloomberg|forbes|cnbc|\bwsj\b|techcrunch|vox|vice|huffpost|buzzfeed|mashable|complex|highsnobiety|hypebeast|gq\b|esquire|mens.?health|womens.?health|runner|self\.com|shape\.com|outside\.com|wired|techradar|verge|engadget|ars.?technica|medium|substack/.test(text)) return "Media & Press";
+  if (/media|press|journal|times|news|broadcast|podcast|magazine|editorial|reporter|writer|blog|\btv\b|radio|streaming|content.?creator|influencer.?market|public.?relation|kommunikation|prensa|redacc|verlag|publish|bild|spiegel|stern|focus|suddeutsch|frankfurter|handelsblatt|tagesspiegel|dpa|efe|ansa|afp/.test(text)) return "Media & Press";
 
   // ── ATHLETES & AMBASSADORS ── athletes, influencers, talent, sports figures
-  if (/athlete|player|ambassador|influencer|talent|champion|olymp|draft|prospect|fitness.?model|brand.?face|sportler|deportista/.test(text)) return "Athletes & Ambassadors";
-
-  // ── STRATEGIC PARTNERS ── leagues, sports orgs, wellness, tech, events, brands with partnership potential
-  if (/partner|collab|alliance|sponsor|foundation|\bngo\b|charity|assoc|federation|league|union|co.?brand|joint.?venture|baller.?league|converge|wellness|hospitality|festival/.test(text)) return "Strategic Partners";
-  if (/nfl\.com|nba\.com|nhl\.com|mlb\.com|mls|fifa|uefa|laliga|bundesliga|premierleague|seahawks|dolphins|lakers|celtics|yankees|cowboys|chiefs|bulls|heat|mavs|knicks|warriors|bruins|leafs|canucks|rangers|cubs|astros|redsox|equinox|crossfit|soulcycle|peloton|orangetheory|barry.?boot/.test(text)) return "Strategic Partners";
+  if (/athlete|player|ambassador|influencer|talent|champion|olymp|draft|prospect|fitness.?model|brand.?face|sportler|deportista|fitfluencer|trainer|coaching.?pro/.test(text)) return "Athletes & Ambassadors";
 
   // ── MANUFACTURING & PRODUCTION ── co-packers, bottling, labs, packaging, formulation
-  if (/manufactur|produc|factory|bottl|co.?pack|private.?label|formul|\blab\b|quality.?control|\bgmp\b|\bfda\b|packag|assembl|fabric|textile|garment|sew|embroid|screen.?print|prototype|drinkworks|beverage.?dev|flavor|recipe|r.?&.?d\b|batch|ferment|pasteur|aseptic|tetrapak|tetra.?pak|crown.?hold|ball.?corp|ardagh|amcor/.test(text)) return "Manufacturing & Production";
+  if (/manufactur|produc|factory|bottl|co.?pack|private.?label|formul|\blab\b|quality.?control|\bgmp\b|\bfda\b|packag|assembl|fabric|textile|garment|sew|embroid|screen.?print|prototype|drinkworks|beverage.?dev|flavor|recipe|batch|ferment|pasteur|aseptic|tetrapak|tetra.?pak|crown.?hold|ball.?corp|ardagh|amcor|rexam|silgan|berlin.?packag|closure.?system/.test(text)) return "Manufacturing & Production";
 
   // ── SUPPLIERS ── ingredients, bottles, labels, caps, raw materials
-  if (/suppli|vendor|procure|raw.?material|ingredient|electrolyte|\bcbd\b|functional.?ingredient|bottle.?suppli|label.?suppli|cap.?suppli|closure|secondary.?packag|flavor.?house|givaudan|firmenich|symrise|dsm|basf|cargill|adm\b|tate.?lyle|sweetener|preserv|coloring|additive/.test(text)) return "Suppliers";
+  if (/suppli|vendor|procure|raw.?material|ingredient|electrolyte|\bcbd\b|functional.?ingredient|closure|flavor.?house|givaudan|firmenich|symrise|\bdsm\b|basf|cargill|\badm\b|tate.?lyle|sweetener|preserv|coloring|additive|nutraceutic|botanical|extract|organic.?sourc/.test(text)) return "Suppliers";
 
   // ── LOGISTICS & FULFILLMENT ── freight, warehousing, 3PL, cold chain, customs
-  if (/logistic|fulfil|shipping|freight|warehouse|delivery|courier|\bdhl\b|\bfedex\b|\bups\b|3pl|dispatch|transport|cargo|cold.?chain|import.?export|customs.?broker|maersk|kuehne|db.?schenk|xpo|flexport|shipbob|deliverr|amazon.?fba/.test(text)) return "Logistics & Fulfillment";
+  if (/logistic|fulfil|shipping|freight|warehouse|delivery|courier|\bdhl\b|\bfedex\b|\bups\b|3pl|dispatch|transport|cargo|cold.?chain|import.?export|customs.?broker|maersk|kuehne|db.?schenk|xpo|flexport|shipbob|deliverr|amazon.?fba|hermes|gls|dpd|tnt\b|schenker/.test(text)) return "Logistics & Fulfillment";
 
-  // ── RETAIL & DISTRIBUTION ── stores, gyms, hotels, distributors, e-commerce
-  if (/retail|distribut|wholesale|\bstore\b|ecommerce|marketplace|boutique|resell|stockist|fitness.?chain|health.?store|hotel|beach.?club|importer|whole.?foods|target|walmart|costco|kroger|trader.?joe|sprouts|publix|safeway|cvs|walgreen|rite.?aid|\bgym\b|gnc|vitamin.?shoppe|amazon|shopify|ebay/.test(text)) return "Retail & Distribution";
+  // ── RETAIL & DISTRIBUTION ── stores, gyms, hotels, bars, distributors, e-commerce
+  if (/retail|distribut|wholesale|ecommerce|marketplace|boutique|resell|stockist|fitness.?chain|health.?store|hotel|beach.?club|importer|whole.?foods|target|walmart|costco|kroger|trader.?joe|sprouts|publix|safeway|cvs|walgreen|rite.?aid|\bgym\b|\bgnc\b|vitamin.?shoppe|amazon|shopify|ebay|rewe|edeka|aldi|lidl|rossmann|dm\.de|mueller\.de|kaufland/.test(text)) return "Retail & Distribution";
 
   // ── ADVISORS & MENTORS ── business, legal, regulatory, accounting
-  if (/advisor|consult|counsel|mentor|legal|\blaw\b|attorney|account|audit|regulat|\bcfo\b|\bcto\b|board|expert|steuerber|rechtsanw|abogad|kanzlei|deloitte|pwc|kpmg|ernst.?young|\bey\b|mckinsey|\bbcg\b|baker.?mckenzie|latham|skadden/.test(text)) return "Advisors & Mentors";
+  if (/advisor|consult|counsel|mentor|legal|\blaw\b|attorney|account|audit|regulat|\bcfo\b|\bcto\b|board\b|expert|steuerber|rechtsanw|abogad|kanzlei|notar|deloitte|pwc|kpmg|ernst.?young|\bey\b|mckinsey|\bbcg\b|baker.?mckenzie|latham|skadden|freshfields|clifford.?chance|hogan.?lovells|allen.?overy/.test(text)) return "Advisors & Mentors";
+
+  // ── STRATEGIC PARTNERS ── leagues, sports orgs, wellness, tech, events, brands
+  if (/partner|collab|alliance|sponsor|foundation|\bngo\b|charity|assoc|federation|league|union|co.?brand|joint.?venture|baller.?league|converge|wellness|hospitality|festival/.test(text)) return "Strategic Partners";
+  if (/nfl\.com|nba\.com|nhl\.com|mlb\.com|mls|fifa|uefa|laliga|bundesliga|premierleague|seahawks|dolphins|lakers|celtics|yankees|cowboys|chiefs|bulls|heat|mavs|knicks|warriors|equinox|crossfit|soulcycle|peloton|orangetheory|barry.?boot|f45\b|anytime.?fitness/.test(text)) return "Strategic Partners";
+  if (/nike|adidas|puma|under.?armour|new.?balance|reebok|asics|lululemon|gymshark|fabletics|alo.?yoga|vuori|on.?running|hoka|salomon|north.?face|patagonia|columbia|arcteryx|moncler/.test(text)) return "Strategic Partners";
+  if (/coca.?cola|pepsi|red.?bull|monster|gatorade|powerade|prime|celsius|bang|reign|bodyarmor|liquid.?death|hint|bai|vitaminwater|lacroix|topo.?chico|nescafe|starbucks|nestle|unilever|danone|keurig|dr.?pepper/.test(text)) return "Strategic Partners";
+  if (/google|apple|microsoft|meta|facebook|instagram|tiktok|snapchat|twitter|spotify|youtube|netflix|disney|warner|sony|samsung|huawei|xiaomi|tesla|uber|lyft|airbnb/.test(text)) return "Strategic Partners";
 
   // ── COMMUNITY & CLUB MEMBERS ── supporters, members, fans
   if (/club|community|member|fan|supporter|youth|academy|grassroot|volunteer|founding|vip|elyte/.test(text)) return "Community & Club Members";
 
-  // ── KNOWN BRANDS (→ Strategic Partners) ── major brands from sports, beverage, lifestyle
-  if (/nike|adidas|puma|under.?armour|new.?balance|reebok|asics|lululemon|gymshark|fabletics|alo.?yoga|vuori|on.?running|hoka|salomon|north.?face|patagonia/.test(text)) return "Strategic Partners";
-  if (/coca.?cola|pepsi|red.?bull|monster|gatorade|powerade|prime|celsius|bang|reign|bodyarmor|liquid.?death|hint|bai|vitaminwater|lacroix|topo.?chico|nescafe|starbucks|nestle/.test(text)) return "Strategic Partners";
+  // ── TLD-based heuristics for remaining business domains
+  if (/\.edu$|\.ac\.|university|universit|hochschule|schule|college|school|campus/.test(domain)) return "Community & Club Members";
+  if (/\.gov$|\.gob\.|gobierno|government|regierung|behorde|stadt|city\./.test(domain)) return "Advisors & Mentors";
+  if (/\.org$/.test(domain)) return "Strategic Partners";
+  if (/\.store$|\.shop$/.test(domain)) return "Retail & Distribution";
 
-  // ── Free email domains → Other (personal emails)
-  if (/gmail\.com|yahoo\.|hotmail\.|outlook\.|icloud\.|proton|aol\.|live\.com|msn\.com|me\.com|mail\.com|gmx\.|web\.de|t-online|freenet|posteo/.test(domain)) return "Other";
-
-  // ── Default for BUSINESS domains → Strategic Partners (not "Other")
-  // Real company domains that didn't match any specific pattern are likely
-  // business contacts worth categorizing as potential partners
+  // ── Default: unknown business domains → Strategic Partners
+  // A real company domain that didn't match anything is most likely a business
+  // contact with partnership or collaboration potential
   return "Strategic Partners";
 }
 
@@ -2589,20 +2596,24 @@ function Contacts({ contacts, onImport, onUpdateContact, onClearMember, onBulkCa
         </div>
       )}
 
-      {cats.filter(cat=>grouped[cat]?.length).map(cat=>(
+      {cats.map(cat=>{
+        const catContacts = grouped[cat] || [];
+        const catColor = PCOLS[cats.indexOf(cat)%PCOLS.length];
+        return (
         <div key={cat} style={{ marginBottom:14 }}>
           <div onClick={()=>toggleCat(cat)}
             style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 18px",
-              background:C2, borderRadius:openCats.has(cat)?"12px 12px 0 0":12,
+              background:C2, borderRadius:openCats.has(cat) && catContacts.length?"12px 12px 0 0":12,
               cursor:"pointer", border:`1px solid ${BD}`,
-              borderBottom: openCats.has(cat) ? "none" : `1px solid ${BD}`,
+              borderBottom: openCats.has(cat) && catContacts.length ? "none" : `1px solid ${BD}`,
+              opacity: catContacts.length ? 1 : 0.5,
               transition:"all 0.2s" }}>
-            <div style={{ height:14, width:4, borderRadius:4, background:PCOLS[cats.indexOf(cat)%PCOLS.length] }}/>
+            <div style={{ height:14, width:4, borderRadius:4, background:catColor }}/>
             <div style={{ color:TX1, fontWeight:700, fontSize:14, flex:1 }}>{cat}</div>
-            <Tag label={`${grouped[cat].length}`} color={PCOLS[cats.indexOf(cat)%PCOLS.length]}/>
-            <span style={{ color:TX3, fontSize:13 }}>{openCats.has(cat)?"^":"v"}</span>
+            <Tag label={`${catContacts.length}`} color={catColor}/>
+            {catContacts.length > 0 && <span style={{ color:TX3, fontSize:13 }}>{openCats.has(cat)?"^":"v"}</span>}
           </div>
-          {openCats.has(cat) && (
+          {openCats.has(cat) && catContacts.length > 0 && (
             <div style={{ border:`1px solid ${BD}`, borderTop:"none", borderRadius:"0 0 12px 12px",
               background:C1, overflow:"hidden" }}>
               <table style={{ width:"100%", borderCollapse:"collapse" }}>
@@ -2610,14 +2621,14 @@ function Contacts({ contacts, onImport, onUpdateContact, onClearMember, onBulkCa
                   <tr style={{ background:C2+"88" }}>
                     {bulkMode && <th style={{ padding:"9px 8px 9px 16px", borderBottom:`1px solid ${BD}`, width:36 }}>
                       <div onClick={()=>{
-                        const catIds = grouped[cat].map(c=>c.id).filter(Boolean);
+                        const catIds = catContacts.map(c=>c.id).filter(Boolean);
                         const allSelected = catIds.every(id=>bulkSelected.has(id));
                         if(allSelected) setBulkSelected(prev=>{const n=new Set(prev);catIds.forEach(id=>n.delete(id));return n;});
                         else setBulkSelected(prev=>{const n=new Set(prev);catIds.forEach(id=>n.add(id));return n;});
                       }} style={{ width:18, height:18, borderRadius:4, border:`2px solid ${bulkSelected.size>0?T:TX3}`,
-                        background:grouped[cat].every(c=>bulkSelected.has(c.id))?T:"transparent", display:"flex",
+                        background:catContacts.every(c=>bulkSelected.has(c.id))?T:"transparent", display:"flex",
                         alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
-                        {grouped[cat].every(c=>bulkSelected.has(c.id)) && <span style={{color:"#0A0613",fontSize:11,fontWeight:800}}>✓</span>}
+                        {catContacts.every(c=>bulkSelected.has(c.id)) && <span style={{color:"#0A0613",fontSize:11,fontWeight:800}}>✓</span>}
                       </div>
                     </th>}
                     {["Name","Company / Email","Owner","Category","Actions"].map(h=>(
@@ -2628,7 +2639,7 @@ function Contacts({ contacts, onImport, onUpdateContact, onClearMember, onBulkCa
                   </tr>
                 </thead>
                 <tbody>
-                  {grouped[cat].map((c,i)=>(
+                  {catContacts.map((c,i)=>(
                     <tr key={c.id||i} onClick={()=>{ if(!bulkMode) setEditContact(c); }}
                       style={{ background: bulkSelected.has(c.id) ? T+"14" : i%2===0?"transparent":C2+"55", cursor:"pointer", transition:"background 0.15s" }}
                       onMouseEnter={e=>e.currentTarget.style.background=bulkSelected.has(c.id)?T+"22":T+"12"}
@@ -2678,9 +2689,9 @@ function Contacts({ contacts, onImport, onUpdateContact, onClearMember, onBulkCa
             </div>
           )}
         </div>
-      ))}
+      );})}
 
-      {!Object.keys(grouped).length && (
+      {!contacts.length && (
         <div style={{ textAlign:"center", padding:"48px 0" }}>
           <div style={{ color:TX1, fontWeight:600, fontSize:16 }}>No contacts yet</div>
           <div style={{ color:TX2, fontSize:13, marginTop:6 }}>Import a CSV or extract from Gmail to get started</div>
