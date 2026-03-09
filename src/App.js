@@ -1433,8 +1433,7 @@ function GmailConnectModal({ onClose, onImport, defaultOwner="Carlos" }) {
         category: r.category || categorizeEmail(r.email || "", r.name || "", r.company || ""),
         email: r.email || "",
         phone: r.phone || "",
-        owner: syncOwner,
-        source: "Gmail Sync"
+        owner: syncOwner
       })).filter(r => (r.name || r.email) && !existingEmails.has((r.email || "").toLowerCase().trim()));
 
       if (!mapped.length) {
