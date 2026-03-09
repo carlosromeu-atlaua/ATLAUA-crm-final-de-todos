@@ -1233,6 +1233,7 @@ function GmailConnectModal({ onClose, onImport, defaultOwner="Carlos" }) {
   const [query, setQuery]   = useState("");
   const [filterCat, setFilterCat] = useState("All");
   const [syncOwner, setSyncOwner] = useState(defaultOwner);
+  const [importing, setImporting] = useState(false);
 
   const loadGSI = () => new Promise((res, rej) => {
     if (window.google?.accounts) { res(); return; }
@@ -1334,34 +1335,31 @@ function GmailConnectModal({ onClose, onImport, defaultOwner="Carlos" }) {
         if (gotPeopleContacts) setProgress(12);
       } catch(_) { /* People API not available, continue with Gmail */ }
 
-      // 2. Fetch ALL messages (sent, received, CC'd — everything)
-      const fetchMessages = async (query, maxMsgs) => {
-        let msgs = [], pt = null, pg = 0;
+      // 2. Fetch messages by label (proven reliable approach)
+      const fetchByLabel = async (labelId, maxMsgs) => {
+        let msgs = [], pt = null;
         do {
-          const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=500${pt ? `&pageToken=${pt}` : ""}`;
+          const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=${labelId}&maxResults=500${pt ? `&pageToken=${pt}` : ""}`;
           const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-          if (!res.ok) break;
+          if (!res.ok) { console.warn(`Gmail fetch ${labelId} failed:`, res.status); break; }
           const d = await res.json();
-          msgs = msgs.concat(d.messages || []);
+          if (!d.messages) break;
+          msgs = msgs.concat(d.messages);
           pt = d.nextPageToken || null;
-          pg++;
         } while (pt && msgs.length < maxMsgs);
         return msgs;
       };
 
       setProgress(gotPeopleContacts ? 14 : 8);
-      const sentMsgs = await fetchMessages("in:sent", 8000);
-      setProgress(gotPeopleContacts ? 20 : 14);
-      const inboxMsgs = await fetchMessages("in:inbox", 8000);
-      setProgress(gotPeopleContacts ? 26 : 20);
-      // Also fetch from other labels (drafts replied to, important, etc.)
-      const otherMsgs = await fetchMessages("-in:sent -in:inbox", 3000);
+      const sentMsgs = await fetchByLabel("SENT", 8000);
+      setProgress(gotPeopleContacts ? 22 : 16);
+      const inboxMsgs = await fetchByLabel("INBOX", 8000);
       setProgress(30);
 
       // Combine and deduplicate message IDs
       const allMsgIds = new Set();
       const allMessages = [];
-      [...sentMsgs, ...inboxMsgs, ...otherMsgs].forEach(m => {
+      [...sentMsgs, ...inboxMsgs].forEach(m => {
         if (m && !allMsgIds.has(m.id)) { allMsgIds.add(m.id); allMessages.push(m); }
       });
 
@@ -1416,58 +1414,74 @@ function GmailConnectModal({ onClose, onImport, defaultOwner="Carlos" }) {
 
   const doImport = async () => {
     setError("");
+    setImporting(true);
     try {
       const toImport = contacts.filter(c => selected.has(c.email));
-      if (!toImport.length) { setError("No contacts selected to import"); return; }
-      setStep(1); setProgress(0);
-      // Import directly to Supabase in batches
+      if (!toImport.length) { setError("No contacts selected to import"); setImporting(false); return; }
+      setStep(3); setProgress(0);
+
+      // Get existing emails to avoid duplicates
       const existingEmails = new Set();
-      const { data: existingCon } = await supabase.from("contacts").select("email");
+      const { data: existingCon, error: fetchErr } = await supabase.from("contacts").select("email");
+      if (fetchErr) console.warn("Could not check existing contacts:", fetchErr.message);
       if (existingCon) existingCon.forEach(c => { if (c.email) existingEmails.add(c.email.toLowerCase().trim()); });
       setProgress(10);
+
       const mapped = toImport.map(r => ({
         name: r.name || r.athlete || "",
         company: r.company || r.agency || "",
         category: r.category || categorizeEmail(r.email || "", r.name || "", r.company || ""),
         email: r.email || "",
         phone: r.phone || "",
-        owner: syncOwner
+        owner: syncOwner,
+        source: "Gmail Sync"
       })).filter(r => (r.name || r.email) && !existingEmails.has((r.email || "").toLowerCase().trim()));
-      if (!mapped.length) { setStep(3); return; }
-      const CHUNK = 50;
+
+      if (!mapped.length) {
+        setProgress(100);
+        setImporting(false);
+        // Still refresh to show all existing contacts
+        const { data: freshCon } = await supabase.from("contacts").select("*");
+        if (freshCon) onImport(freshCon.map(c => ({ ...c, athlete: c.name || "", owner: c.owner || syncOwner, category: CONTACT_CATS.includes(c.category) ? c.category : categorizeEmail(c.email||"",c.name||"",c.company||"") })), "refresh");
+        return;
+      }
+
       let imported = 0;
+      let errors = 0;
+      const CHUNK = 30;
       for (let i = 0; i < mapped.length; i += CHUNK) {
         const chunk = mapped.slice(i, i + CHUNK);
         const { data, error: insertErr } = await supabase.from("contacts").insert(chunk).select();
         if (insertErr) {
-          console.error("Insert error:", insertErr.message);
+          console.error("Batch insert error:", insertErr.message);
+          // Fallback: insert one by one
           for (const row of chunk) {
             const { data: single, error: singleErr } = await supabase.from("contacts").insert([row]).select();
-            if (single?.length) {
-              onImport([{ ...single[0], athlete: single[0].name, owner: syncOwner }], "noop");
-              imported++;
-            } else if (singleErr) {
-              console.warn("Skipped:", row.email, singleErr.message);
-            }
+            if (single?.length) imported++;
+            else { errors++; if (singleErr) console.warn("Skip:", row.email, singleErr.message); }
           }
         } else if (data) {
           imported += data.length;
         }
-        setProgress(10 + Math.round(((i + CHUNK) / mapped.length) * 85));
+        setProgress(10 + Math.round(((i + CHUNK) / mapped.length) * 80));
       }
-      // Refresh contacts from Supabase to ensure state is accurate
+
+      // Always refresh ALL contacts from Supabase (includes all team members' contacts)
       const { data: freshCon } = await supabase.from("contacts").select("*");
       if (freshCon) {
         const refreshed = freshCon.map(c => ({
-          ...c, athlete: c.name || "", owner: c.owner || syncOwner,
+          ...c, athlete: c.name || "", owner: c.owner || "Carlos",
           category: CONTACT_CATS.includes(c.category) ? c.category : categorizeEmail(c.email || "", c.name || "", c.company || "")
         }));
         onImport(refreshed, "refresh");
       }
+
       setProgress(100);
-      setStep(3);
+      if (errors > 0) setError(`Imported ${imported} contacts. ${errors} failed (may be RLS — check Supabase policies).`);
+      setImporting(false);
     } catch (e) {
-      setError(`Import failed: ${e.message}. Please try again.`);
+      setError(`Import failed: ${e.message}`);
+      setImporting(false);
       setStep(2);
     }
   };
@@ -1622,15 +1636,31 @@ function GmailConnectModal({ onClose, onImport, defaultOwner="Carlos" }) {
           </div>
         )}
 
-        {/* Step 3: Done */}
+        {/* Step 3: Importing / Done */}
         {step===3 && (
           <div style={{ textAlign:"center", padding:"20px 0" }}>
-            <div style={{ width:52, height:52, borderRadius:"50%", background:GREEN+"22", border:`2px solid ${GREEN}44`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px" }}><svg width="28" height="28" fill="none" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4" stroke={GREEN} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg></div>
-            <div style={{ color:TX1, fontSize:20, fontWeight:700, marginBottom:8 }}>Contacts imported!</div>
-            <div style={{ color:TX2, fontSize:14 }}>Your Gmail contacts are now in the CRM</div>
-            <div style={{ marginTop:24 }}>
-              <Btn onClick={onClose}>Back to Contacts</Btn>
-            </div>
+            {importing ? (
+              <>
+                <div style={{ fontSize:40, marginBottom:16 }}>⏳</div>
+                <div style={{ color:TX1, fontWeight:700, fontSize:16, marginBottom:8 }}>Importing {selected.size} contacts...</div>
+                <div style={{ color:TX2, fontSize:13, marginBottom:20 }}>Saving to database — please wait</div>
+                <div style={{ background:C3, borderRadius:8, height:8, overflow:"hidden" }}>
+                  <div style={{ height:"100%", width:`${progress}%`, background:`linear-gradient(90deg,${T},${GREEN})`,
+                    borderRadius:8, transition:"width 0.4s ease" }}/>
+                </div>
+                <div style={{ color:TX3, fontSize:12, marginTop:8 }}>{progress}%</div>
+              </>
+            ) : (
+              <>
+                <div style={{ width:52, height:52, borderRadius:"50%", background:GREEN+"22", border:`2px solid ${GREEN}44`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px" }}><svg width="28" height="28" fill="none" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4" stroke={GREEN} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg></div>
+                <div style={{ color:TX1, fontSize:20, fontWeight:700, marginBottom:8 }}>Contacts imported!</div>
+                <div style={{ color:TX2, fontSize:14 }}>Your Gmail contacts are now in the CRM</div>
+                {error && <div style={{ color:"#ff9999", fontSize:13, marginTop:8 }}>{error}</div>}
+                <div style={{ marginTop:24 }}>
+                  <Btn onClick={onClose}>Back to Contacts</Btn>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
