@@ -3621,9 +3621,11 @@ function LoginScreen({ onAuth }) {
           if (d2?.session) { onAuth(d2.session); return; }
         }
       }
-      onAuth({ user: { email: selectedEmail }, quick_access: true });
-    } catch {
-      onAuth({ user: { email: selectedEmail }, quick_access: true });
+      setError("Authentication failed. Please try again.");
+      setLoading("");
+    } catch (err) {
+      setError("Network error. Check your connection and try again.");
+      setLoading("");
     }
   };
 
@@ -3778,28 +3780,16 @@ export default function App() {
   const currentEmail = session?.user?.email || "";
 
   useEffect(() => {
-    const quickEmail = localStorage.getItem(QUICK_ACCESS_KEY);
-    // 1. Try to get existing Supabase session first
+    // Try to restore existing Supabase session (real auth only — no fake sessions)
     supabase.auth.getSession().then(async ({ data: { session: s } }) => {
       if (s && ALLOWED_EMAILS.includes(s.user?.email?.toLowerCase())) {
         setSession(s);
-        setAuthLoading(false);
-        return;
-      }
-      // 2. If we have a quick access email but no Supabase session, sign in to Supabase
-      if (quickEmail && ALLOWED_EMAILS.includes(quickEmail.toLowerCase())) {
-        try {
-          const { data } = await supabase.auth.signInWithPassword({ email: quickEmail.toLowerCase(), password: TEAM_PASSWORD });
-          if (data?.session) { setSession(data.session); setAuthLoading(false); return; }
-        } catch {}
-        // Fallback to quick access if Supabase sign-in fails
-        setSession({ user: { email: quickEmail.toLowerCase() }, quick_access: true });
       }
       setAuthLoading(false);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_ev, s) => {
       if (s && ALLOWED_EMAILS.includes(s.user?.email?.toLowerCase())) setSession(s);
-      else if (!s && !localStorage.getItem(QUICK_ACCESS_KEY)) setSession(null);
+      else if (!s) { setSession(null); localStorage.removeItem(QUICK_ACCESS_KEY); }
     });
     return () => subscription.unsubscribe();
   }, []);
