@@ -2,6 +2,12 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { createClient } from "@supabase/supabase-js";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, AreaChart, Area, LineChart, Line, CartesianGrid } from "recharts";
 
+// Auto-redirect to canonical URL so Google OAuth always works
+const CANONICAL_HOST = "atlaua-crm-final-de-todos.vercel.app";
+if (typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== CANONICAL_HOST) {
+  window.location.replace("https://" + CANONICAL_HOST + window.location.pathname + window.location.search + window.location.hash);
+}
+
 const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || "https://iwkfribpdpaeglaogxkx.supabase.co";
 const SUPABASE_KEY = process.env.REACT_APP_SUPABASE_KEY || "sb_publishable_3Jb6ozoasZI7Xa0In9SSEA_UZkq-IiS";
 const supabase = window.__supabase || (window.__supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
@@ -672,11 +678,12 @@ const TODAY   = new Date().toISOString().split("T")[0];
 const LEAGUES = ["NFL","NBA","NHL","MLB","UFC"];
 const STATUSES= ["Contacted","Negotiating","Proposal Sent","Closed Won","Closed Lost","Pending"];
 const ICONS   = {NFL:"",NBA:"",NHL:"",MLB:"",UFC:""};
-const TEAM_MEMBERS = ["Carlos","Maya","Adrian","Steven","Jaime","Felix"];
+const TEAM_MEMBERS = ["Carlos","Maya","Adrian","Info Atlaua"];
 const TEAM_EMAIL_MAP = {
   "carlosromeu@atlaua.de":"Carlos",
   "mayakoar@atlaua.de":"Maya",
-  "adriangoransch@atlaua.de":"Adrian"
+  "adriangoransch@atlaua.de":"Adrian",
+  "info@atlaua.de":"Info Atlaua"
 };
 const ALLOWED_EMAILS = Object.keys(TEAM_EMAIL_MAP);
 
@@ -711,12 +718,25 @@ const R_SM = 8, R_MD = 12, R_LG = 16, R_XL = 20, R_PILL = 100;
 const SCOL  = { Contacted:T, Negotiating:GOLD, "Proposal Sent":PURP, "Closed Won":GREEN, "Closed Lost":"#444", Pending:TX3 };
 const PCOLS = [T, WINE, GOLD, PURP, ROSE, GREEN];
 const LCOLS = { NFL:WINE, NBA:T, NHL:PURP, MLB:GREEN, UFC:GOLD };
-const MEMBER_COLORS = { Carlos:T, Maya:ROSE, Adrian:PURP, Steven:GOLD, Jaime:GREEN, Felix:"#FF6B35" };
+const MEMBER_COLORS = { Carlos:T, Maya:ROSE, Adrian:PURP, "Info Atlaua":GOLD };
 
 // ─── GOOGLE OAUTH ─────────────────────────────────────────────────────────────
 // IMPORTANT: Replace with your own Google OAuth client ID from console.cloud.google.com
 // Enable "Gmail API" and set authorized origins to http://localhost:3000
-const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID";
+const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "565740819737-68od2bh1vr50f2pp458lgemlho7eg3q2.apps.googleusercontent.com";
+
+// ─── AUTO-TRACKER CONFIGURATION ──────────────────────────────────────────────
+const AUTO_TRACK_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const AUTO_TRACK_STORAGE_PREFIX = "atlaua_gmail_tracker_";
+const AUTO_TRACK_TOKEN_PREFIX = "atlaua_gmail_token_";
+const STATUS_PATTERNS = {
+  "Closed Won": /\b(accept|agreed|signed|deal\s*done|confirm.*partnership|welcome\s*aboard|contract\s*signed|done\s*deal)\b/i,
+  "Closed Lost": /\b(decline|reject|not\s*interested|pass\s*on|no\s*thank|unfortunately.*not|decided\s*against|going\s*another\s*direction)\b/i,
+  "Proposal Sent": /\b(proposal\s*(sent|attached|enclosed)|sending.*proposal|attached.*proposal|find.*proposal|deck\s*attached|presentation\s*attached|offer\s*letter)\b/i,
+  "Negotiating": /\b(schedule.*call|call\s*scheduled|meeting\s*set|let'?s\s*hop\s*on|zoom\s*link|calendar\s*invite|follow.?up\s*call|negotiat|discuss\s*terms|terms\s*sheet)\b/i,
+  "Contacted": /\b(reaching\s*out|initial\s*contact|first\s*email|introduction|nice\s*to\s*meet|wanted\s*to\s*connect|touching\s*base)\b/i,
+};
+const STATUS_PRIORITY = { "Pending":0, "Contacted":1, "Negotiating":2, "Proposal Sent":3, "Closed Won":4, "Closed Lost":4 };
 
 // ─── UTILITIES ────────────────────────────────────────────────────────────────
 function parseCSV(text) {
@@ -841,6 +861,157 @@ function categorizeEmail(email, name, company) {
 
   // ── Default: unknown business domains → Strategic Partners
   return "Strategic Partners";
+}
+
+// ─── AUTOMATIC GMAIL TRACKING HOOK ──────────────────────────────────────────
+function useGmailAutoTracker({ currentEmail, currentUser, athletes, contacts, setContacts, setAthletes, logActivity }) {
+  const intervalRef = useRef(null);
+  const runningRef = useRef(false);
+
+  const getToken = useCallback(() => {
+    try {
+      const data = JSON.parse(localStorage.getItem(AUTO_TRACK_TOKEN_PREFIX + currentEmail) || "null");
+      if (!data) return null;
+      if (data.expiresAt && Date.now() > data.expiresAt) {
+        localStorage.removeItem(AUTO_TRACK_TOKEN_PREFIX + currentEmail);
+        return null;
+      }
+      return data.accessToken;
+    } catch { return null; }
+  }, [currentEmail]);
+
+  const saveTokenFromManualSync = useCallback((accessToken) => {
+    localStorage.setItem(AUTO_TRACK_TOKEN_PREFIX + currentEmail, JSON.stringify({
+      accessToken, expiresAt: Date.now() + 3500000
+    }));
+  }, [currentEmail]);
+
+  const getLastSync = useCallback(() => parseInt(localStorage.getItem(AUTO_TRACK_STORAGE_PREFIX + currentEmail) || "0", 10), [currentEmail]);
+  const setLastSync = useCallback((ts) => localStorage.setItem(AUTO_TRACK_STORAGE_PREFIX + currentEmail, String(ts)), [currentEmail]);
+
+  const pollGmail = useCallback(async () => {
+    if (runningRef.current) return;
+    const accessToken = getToken();
+    if (!accessToken) return;
+    runningRef.current = true;
+    try {
+      const lastSync = getLastSync();
+      const afterEpoch = lastSync > 0 ? Math.floor(lastSync / 1000) : Math.floor((Date.now() - 24*60*60*1000) / 1000);
+      const q = encodeURIComponent(`after:${afterEpoch}`);
+      const listRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${q}&maxResults=100`,
+        { headers: { Authorization: `Bearer ${accessToken}` } });
+      if (listRes.status === 401) { localStorage.removeItem(AUTO_TRACK_TOKEN_PREFIX + currentEmail); runningRef.current = false; return; }
+      if (!listRes.ok) { runningRef.current = false; return; }
+      const listData = await listRes.json();
+      const messages = listData.messages || [];
+      if (!messages.length) { setLastSync(Date.now()); runningRef.current = false; return; }
+
+      const existingContactEmails = new Set(contacts.map(c => (c.email || "").toLowerCase()));
+      const existingAthleteEmails = new Set(athletes.map(a => (a.email || "").toLowerCase()));
+      const ownEmail = currentEmail.toLowerCase();
+      const newContacts = [];
+      const statusUpdates = [];
+
+      for (let i = 0; i < Math.min(messages.length, 100); i += 20) {
+        const batch = messages.slice(i, i + 20);
+        await Promise.all(batch.map(async (msg) => {
+          try {
+            const r = await fetch(
+              `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc&metadataHeaders=Subject`,
+              { headers: { Authorization: `Bearer ${accessToken}` } });
+            if (!r.ok) return;
+            const data = await r.json();
+            const hdrs = data.payload?.headers || [];
+            const gh = (n) => (hdrs.find(h => h.name === n) || {}).value || "";
+            const fromH = gh("From"), toH = gh("To"), ccH = gh("Cc"), subject = gh("Subject");
+            const snippet = data.snippet || "";
+            const allAddr = [...parseEmailAddresses(fromH), ...parseEmailAddresses(toH), ...parseEmailAddresses(ccH)];
+
+            for (const { name, email } of allAddr) {
+              const em = email.toLowerCase().trim();
+              if (!em || !em.includes("@")) continue;
+              if (em === ownEmail || em.endsWith("@atlaua.de")) continue;
+              if (/^(noreply|no-reply|mailer-daemon|postmaster|bounce|daemon|do-not-reply|donotreply|auto-reply)@/.test(em)) continue;
+              if (!existingContactEmails.has(em)) {
+                existingContactEmails.add(em);
+                const cleanName = (name && !name.includes("@") && name.trim().length > 1) ? name.trim() : "";
+                newContacts.push({
+                  name: cleanName || em.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
+                  email: em, company: "", phone: "",
+                  category: categorizeEmail(em, cleanName || "", ""),
+                  owner: currentUser
+                });
+              }
+            }
+
+            // For info@atlaua.de: detect athlete status changes from email content
+            if (currentEmail === "info@atlaua.de") {
+              const textToAnalyze = `${subject} ${snippet}`;
+              for (const athlete of athletes) {
+                const agentEmail = (athlete.email || "").toLowerCase();
+                if (!agentEmail) continue;
+                const involvedEmails = allAddr.map(a => a.email.toLowerCase());
+                if (involvedEmails.includes(agentEmail)) {
+                  let detectedStatus = null;
+                  for (const [status, pattern] of Object.entries(STATUS_PATTERNS)) {
+                    if (pattern.test(textToAnalyze)) { detectedStatus = status; break; }
+                  }
+                  if (detectedStatus) {
+                    const curP = STATUS_PRIORITY[athlete.status] || 0;
+                    const newP = STATUS_PRIORITY[detectedStatus] || 0;
+                    if (newP > curP || detectedStatus === "Closed Lost") {
+                      statusUpdates.push({ athlete, newStatus: detectedStatus, subject });
+                    }
+                  }
+                }
+              }
+            }
+          } catch (_) {}
+        }));
+      }
+
+      // Insert new contacts
+      if (newContacts.length > 0) {
+        for (let i = 0; i < newContacts.length; i += 30) {
+          const chunk = newContacts.slice(i, i + 30);
+          const { data } = await supabase.from("contacts").upsert(chunk, { onConflict: "email,owner", ignoreDuplicates: true }).select();
+          if (data?.length) {
+            setContacts(prev => {
+              const ids = new Set(prev.map(c => c.id));
+              const fresh = data.filter(d => !ids.has(d.id)).map(c => ({
+                ...c, athlete: c.name, owner: c.owner || currentUser,
+                category: CONTACT_CATS.includes(c.category) ? c.category : categorizeEmail(c.email||"", c.name||"", c.company||"")
+              }));
+              return fresh.length ? [...fresh, ...prev] : prev;
+            });
+          }
+        }
+        logActivity("Auto-tracked", `${newContacts.length} new contacts`, `Gmail (${currentUser})`);
+      }
+
+      // Update athlete statuses (info@atlaua.de only)
+      if (statusUpdates.length > 0) {
+        for (const { athlete, newStatus, subject } of statusUpdates) {
+          if (athlete.id) {
+            await supabase.from("athletes").update({ status: newStatus }).eq("id", athlete.id);
+          }
+          setAthletes(prev => prev.map(a => a.id === athlete.id ? { ...a, status: newStatus } : a));
+          logActivity("Auto-status", athlete.athlete || athlete.name, `${athlete.status} → ${newStatus} (${subject.substring(0, 40)})`);
+        }
+      }
+
+      setLastSync(Date.now());
+    } catch (err) { console.warn("[AutoTracker] Poll error:", err.message); }
+    runningRef.current = false;
+  }, [getToken, getLastSync, setLastSync, currentEmail, currentUser, athletes, contacts, setContacts, setAthletes, logActivity]);
+
+  useEffect(() => {
+    const init = setTimeout(() => pollGmail(), 10000);
+    intervalRef.current = setInterval(pollGmail, AUTO_TRACK_INTERVAL);
+    return () => { clearTimeout(init); if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [pollGmail]);
+
+  return { saveTokenFromManualSync, getToken };
 }
 
 function formatDate(dateStr) {
@@ -1223,7 +1394,7 @@ function ImportCSVModal({ onClose, onImport, mode = "athletes" }) {
 }
 
 // ─── GMAIL CONNECT MODAL ──────────────────────────────────────────────────────
-function GmailConnectModal({ onClose, onImport, defaultOwner="Carlos" }) {
+function GmailConnectModal({ onClose, onImport, defaultOwner="Carlos", onTokenCapture }) {
   const [step, setStep]   = useState(0); // 0=info, 1=loading, 2=preview, 3=done
   const [token, setToken] = useState(null);
   const [contacts, setContacts] = useState([]);
@@ -1264,6 +1435,7 @@ function GmailConnectModal({ onClose, onImport, defaultOwner="Carlos" }) {
             setError(errMsg); setStep(0); return;
           }
           setToken(resp.access_token);
+          if (onTokenCapture) onTokenCapture(resp.access_token);
           await fetchContacts(resp.access_token);
         },
         error_callback: (err) => {
@@ -1420,63 +1592,89 @@ function GmailConnectModal({ onClose, onImport, defaultOwner="Carlos" }) {
       if (!toImport.length) { setError("No contacts selected to import"); setImporting(false); return; }
       setStep(3); setProgress(0);
 
-      // Get existing emails to avoid duplicates
-      const existingEmails = new Set();
-      const { data: existingCon, error: fetchErr } = await supabase.from("contacts").select("email");
-      if (fetchErr) console.warn("Could not check existing contacts:", fetchErr.message);
-      if (existingCon) existingCon.forEach(c => { if (c.email) existingEmails.add(c.email.toLowerCase().trim()); });
       setProgress(10);
 
+      // Use upsert — inserts new contacts, updates existing ones by email
       const mapped = toImport.map(r => ({
         name: r.name || r.athlete || "",
         company: r.company || r.agency || "",
         category: r.category || categorizeEmail(r.email || "", r.name || "", r.company || ""),
-        email: r.email || "",
+        email: (r.email || "").toLowerCase().trim(),
         phone: r.phone || "",
         owner: syncOwner
-      })).filter(r => (r.name || r.email) && !existingEmails.has((r.email || "").toLowerCase().trim()));
+      })).filter(r => (r.name || r.email));
 
-      if (!mapped.length) {
+      // Deduplicate by email within the batch (keep first occurrence)
+      const seen = new Set();
+      const deduped = mapped.filter(r => {
+        const key = r.email.toLowerCase().trim();
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      if (!deduped.length) {
         setProgress(100);
         setImporting(false);
-        // Still refresh to show all existing contacts
-        const { data: freshCon } = await supabase.from("contacts").select("*");
-        if (freshCon) onImport(freshCon.map(c => ({ ...c, athlete: c.name || "", owner: c.owner || syncOwner, category: CONTACT_CATS.includes(c.category) ? c.category : categorizeEmail(c.email||"",c.name||"",c.company||"") })), "refresh");
+        // Paginated fetch
+        let allCon = []; let f = 0;
+        while (true) { const { data: b } = await supabase.from("contacts").select("*").range(f, f+999); if(!b||!b.length) break; allCon=allCon.concat(b); if(b.length<1000) break; f+=1000; }
+        if (allCon.length) onImport(allCon.map(c => ({ ...c, athlete: c.name || "", owner: c.owner || syncOwner, category: CONTACT_CATS.includes(c.category) ? c.category : categorizeEmail(c.email||"",c.name||"",c.company||"") })), "refresh");
         return;
       }
 
+      // Upsert by (email + owner) so each team member keeps their own contacts
       let imported = 0;
       let errors = 0;
       const CHUNK = 30;
-      for (let i = 0; i < mapped.length; i += CHUNK) {
-        const chunk = mapped.slice(i, i + CHUNK);
-        const { data, error: insertErr } = await supabase.from("contacts").insert(chunk).select();
-        if (insertErr) {
-          console.error("Batch insert error:", insertErr.message);
-          // Fallback: insert one by one
+
+      for (let i = 0; i < deduped.length; i += CHUNK) {
+        const chunk = deduped.slice(i, i + CHUNK);
+        // Try upsert on (email, owner) — each team member has their own copy
+        const { data, error: upsertErr } = await supabase.from("contacts").upsert(chunk, { onConflict: "email,owner", ignoreDuplicates: false }).select();
+        if (upsertErr) {
+          console.warn("Upsert error, falling back to one-by-one:", upsertErr.message);
           for (const row of chunk) {
-            const { data: single, error: singleErr } = await supabase.from("contacts").insert([row]).select();
-            if (single?.length) imported++;
-            else { errors++; if (singleErr) console.warn("Skip:", row.email, singleErr.message); }
+            // Try upsert single, if fails try insert
+            const { data: s, error: se } = await supabase.from("contacts").upsert([row], { onConflict: "email,owner", ignoreDuplicates: false }).select();
+            if (s?.length) { imported++; }
+            else {
+              // Final fallback: plain insert (skip if duplicate)
+              const { data: s2, error: se2 } = await supabase.from("contacts").insert([row]).select();
+              if (s2?.length) imported++;
+              else { errors++; if (se2) console.warn("Skip:", row.email, se2.message); }
+            }
           }
         } else if (data) {
           imported += data.length;
         }
-        setProgress(10 + Math.round(((i + CHUNK) / mapped.length) * 80));
+        setProgress(10 + Math.round(((i + CHUNK) / deduped.length) * 80));
       }
 
-      // Always refresh ALL contacts from Supabase (includes all team members' contacts)
-      const { data: freshCon } = await supabase.from("contacts").select("*");
+      // Always refresh ALL contacts from Supabase (paginate past 1000 limit)
+      let freshCon = [];
+      let rFrom = 0;
+      while (true) {
+        const { data: batch } = await supabase.from("contacts").select("*").range(rFrom, rFrom + 999);
+        if (!batch || batch.length === 0) break;
+        freshCon = freshCon.concat(batch);
+        if (batch.length < 1000) break;
+        rFrom += 1000;
+      }
+      console.log(`[Gmail Sync] Upserted: ${imported}, Errors: ${errors}, DB total: ${freshCon?.length || 0}, Owner: ${syncOwner}`);
       if (freshCon) {
         const refreshed = freshCon.map(c => ({
-          ...c, athlete: c.name || "", owner: c.owner || "Carlos",
+          ...c, athlete: c.name || "", owner: c.owner || syncOwner,
           category: CONTACT_CATS.includes(c.category) ? c.category : categorizeEmail(c.email || "", c.name || "", c.company || "")
         }));
         onImport(refreshed, "refresh");
       }
 
       setProgress(100);
-      if (errors > 0) setError(`Imported ${imported} contacts. ${errors} failed (may be RLS — check Supabase policies).`);
+      const ownerCount = freshCon ? freshCon.filter(c => c.owner === syncOwner).length : 0;
+      const totalCount = freshCon ? freshCon.length : 0;
+      if (errors > 0) setError(`Synced ${imported} contacts. ${errors} failed. Your contacts: ${ownerCount}. Team total: ${totalCount}.`);
+      else setError(`✅ Synced ${imported} contacts for ${syncOwner}. Your contacts: ${ownerCount}. Team total: ${totalCount}.`);
       setImporting(false);
     } catch (e) {
       setError(`Import failed: ${e.message}`);
@@ -2179,14 +2377,272 @@ function Dashboard({ athletes, onSelect }) {
   );
 }
 
+// ─── EMAIL HISTORY SCANNER (backfill athlete statuses from Gmail) ─────────────
+function EmailHistoryScanner({ athletes, onStatusUpdate, onClose }) {
+  const [scanning, setScanning] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [results, setResults] = useState(null);
+  const [error, setError] = useState("");
+  const [log, setLog] = useState([]);
+
+  const addLog = (msg) => setLog(prev => [...prev, msg]);
+
+  const startScan = async () => {
+    setScanning(true); setError(""); setProgress(0); setLog([]); setResults(null);
+    try {
+      // Load GSI
+      if (!window.google?.accounts) {
+        const s = document.createElement("script");
+        s.src = "https://accounts.google.com/gsi/client";
+        await new Promise((r, j) => { s.onload = r; s.onerror = j; document.head.appendChild(s); });
+      }
+      addLog("Connecting to Gmail (info@atlaua.de)...");
+
+      // Get token
+      const accessToken = await new Promise((resolve, reject) => {
+        const tc = window.google.accounts.oauth2.initTokenClient({
+          client_id: GOOGLE_CLIENT_ID,
+          scope: "https://www.googleapis.com/auth/gmail.readonly",
+          callback: (resp) => { if (resp.error) reject(resp); else resolve(resp.access_token); },
+          error_callback: (err) => reject(err),
+          hint: "info@atlaua.de"
+        });
+        tc.requestAccessToken();
+      });
+      addLog("✅ Connected. Fetching sent emails...");
+      setProgress(5);
+
+      // Build athlete email map for matching
+      const athleteByEmail = {};
+      const athleteByAgent = {};
+      athletes.forEach(a => {
+        const em = (a.email || "").toLowerCase().trim();
+        if (em) {
+          athleteByEmail[em] = a;
+          // Also index by agent name for fuzzy matching
+          if (a.agent) athleteByAgent[a.agent.toLowerCase()] = a;
+        }
+      });
+      addLog(`Tracking ${Object.keys(athleteByEmail).length} agent emails from ${athletes.length} athletes`);
+
+      // Fetch ALL sent messages
+      const fetchAll = async (labelId) => {
+        let msgs = [], pt = null;
+        do {
+          const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=${labelId}&maxResults=500${pt ? `&pageToken=${pt}` : ""}`;
+          const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+          if (!res.ok) break;
+          const d = await res.json();
+          if (!d.messages) break;
+          msgs = msgs.concat(d.messages);
+          pt = d.nextPageToken || null;
+        } while (pt && msgs.length < 10000);
+        return msgs;
+      };
+
+      const sentMsgs = await fetchAll("SENT");
+      addLog(`Found ${sentMsgs.length} sent emails`);
+      setProgress(15);
+
+      const inboxMsgs = await fetchAll("INBOX");
+      addLog(`Found ${inboxMsgs.length} inbox emails`);
+      setProgress(25);
+
+      // Combine and deduplicate
+      const allIds = new Set();
+      const allMsgs = [];
+      [...sentMsgs, ...inboxMsgs].forEach(m => {
+        if (!allIds.has(m.id)) { allIds.add(m.id); allMsgs.push(m); }
+      });
+      addLog(`Total unique: ${allMsgs.length} emails to scan`);
+
+      // Scan messages for athlete/agent matches
+      const statusMap = {}; // athleteId -> { status, subject, priority }
+      const batchSize = 30;
+      let scanned = 0;
+
+      for (let i = 0; i < allMsgs.length; i += batchSize) {
+        const batch = allMsgs.slice(i, i + batchSize);
+        await Promise.all(batch.map(async (msg) => {
+          try {
+            const r = await fetch(
+              `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc&metadataHeaders=Bcc&metadataHeaders=Subject`,
+              { headers: { Authorization: `Bearer ${accessToken}` } });
+            if (!r.ok) return;
+            const data = await r.json();
+            const hdrs = data.payload?.headers || [];
+            const gh = (n) => (hdrs.find(h => h.name === n) || {}).value || "";
+            const allAddr = [...parseEmailAddresses(gh("From")), ...parseEmailAddresses(gh("To")),
+                             ...parseEmailAddresses(gh("Cc")), ...parseEmailAddresses(gh("Bcc"))];
+            const subject = gh("Subject");
+            const snippet = data.snippet || "";
+            const textToAnalyze = `${subject} ${snippet}`;
+
+            // Check every address against known athlete agent emails
+            for (const { email } of allAddr) {
+              const em = email.toLowerCase().trim();
+              const matchedAthlete = athleteByEmail[em];
+              if (!matchedAthlete) continue;
+
+              // Detect status from content
+              let detectedStatus = "Contacted"; // Any email = at least Contacted
+              for (const [st, pattern] of Object.entries(STATUS_PATTERNS)) {
+                if (pattern.test(textToAnalyze)) { detectedStatus = st; break; }
+              }
+
+              const priority = STATUS_PRIORITY[detectedStatus] || 0;
+              const existing = statusMap[matchedAthlete.id];
+              if (!existing || priority > existing.priority || (detectedStatus === "Closed Lost" && existing.status !== "Closed Lost")) {
+                statusMap[matchedAthlete.id] = { status: detectedStatus, subject, priority, athlete: matchedAthlete };
+              }
+            }
+          } catch (_) {}
+        }));
+        scanned += batch.length;
+        setProgress(25 + Math.round((scanned / allMsgs.length) * 70));
+      }
+
+      // Compile results
+      const updates = Object.values(statusMap).filter(u => {
+        const curP = STATUS_PRIORITY[u.athlete.status] || 0;
+        return u.priority > curP || (u.status === "Closed Lost" && u.athlete.status !== "Closed Lost");
+      });
+
+      setProgress(100);
+      setResults({ total: allMsgs.length, matched: Object.keys(statusMap).length, updates });
+      addLog(`✅ Scan complete! Found ${Object.keys(statusMap).length} athletes in emails, ${updates.length} need status update.`);
+    } catch (e) {
+      setError(`Scan failed: ${e.message || "Could not connect to Gmail"}`);
+    }
+    setScanning(false);
+  };
+
+  const applyUpdates = async () => {
+    if (!results?.updates.length) return;
+    for (const u of results.updates) {
+      if (u.athlete.id) {
+        await supabase.from("athletes").update({ status: u.status }).eq("id", u.athlete.id);
+      }
+      onStatusUpdate(u.athlete.id, u.status);
+    }
+    addLog(`✅ Applied ${results.updates.length} status updates!`);
+    setResults(prev => ({ ...prev, applied: true }));
+  };
+
+  return (
+    <div style={{ position:"fixed", inset:0, zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center",
+      background:"rgba(0,0,0,0.7)", backdropFilter:"blur(8px)" }} onClick={e => e.target === e.currentTarget && !scanning && onClose()}>
+      <div style={{ background:C1, border:`1px solid ${BD}`, borderRadius:16, padding:28, width:"100%", maxWidth:600,
+        maxHeight:"85vh", overflow:"auto" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
+          <h2 style={{ color:TX1, fontSize:20, fontWeight:700, margin:0 }}>📧 Email History Scanner</h2>
+          {!scanning && <button onClick={onClose} style={{ background:"none", border:"none", color:TX3, cursor:"pointer", fontSize:18 }}>✕</button>}
+        </div>
+
+        <p style={{ color:TX2, fontSize:13, lineHeight:1.6, marginBottom:16 }}>
+          Scans your <b>info@atlaua.de</b> Gmail to find all emails with athlete agents
+          and automatically updates their pipeline status (Contacted → Negotiating → Proposal Sent → Closed Won/Lost).
+        </p>
+
+        {!scanning && !results && (
+          <Btn onClick={startScan} size="lg" style={{ width:"100%", justifyContent:"center" }}>
+            🔍 Start Full Email Scan
+          </Btn>
+        )}
+
+        {scanning && (
+          <div style={{ marginBottom:16 }}>
+            <div style={{ height:8, background:C2, borderRadius:4, overflow:"hidden", marginBottom:8 }}>
+              <div style={{ height:"100%", width:`${progress}%`, background:`linear-gradient(90deg, ${T}, ${PURP})`,
+                borderRadius:4, transition:"width 0.3s" }}/>
+            </div>
+            <div style={{ color:TX3, fontSize:12, textAlign:"center" }}>{progress}% — Scanning emails...</div>
+          </div>
+        )}
+
+        {error && <div style={{ color:WINE, fontSize:13, padding:12, background:WINE+"15", borderRadius:8, marginBottom:12 }}>{error}</div>}
+
+        {log.length > 0 && (
+          <div style={{ background:C2, borderRadius:8, padding:12, marginBottom:16, maxHeight:200, overflow:"auto" }}>
+            {log.map((l, i) => <div key={i} style={{ color:TX2, fontSize:11, fontFamily:"monospace", marginBottom:4 }}>{l}</div>)}
+          </div>
+        )}
+
+        {results && (
+          <div style={{ marginTop:16 }}>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12, marginBottom:16 }}>
+              <Card style={{ padding:12, textAlign:"center" }}>
+                <div style={{ color:TX3, fontSize:10, fontWeight:600, textTransform:"uppercase" }}>Emails Scanned</div>
+                <div style={{ color:TX1, fontSize:22, fontWeight:700 }}>{results.total.toLocaleString()}</div>
+              </Card>
+              <Card style={{ padding:12, textAlign:"center" }}>
+                <div style={{ color:TX3, fontSize:10, fontWeight:600, textTransform:"uppercase" }}>Athletes Found</div>
+                <div style={{ color:T, fontSize:22, fontWeight:700 }}>{results.matched}</div>
+              </Card>
+              <Card style={{ padding:12, textAlign:"center" }}>
+                <div style={{ color:TX3, fontSize:10, fontWeight:600, textTransform:"uppercase" }}>Updates Needed</div>
+                <div style={{ color:results.updates.length > 0 ? GOLD : GREEN, fontSize:22, fontWeight:700 }}>{results.updates.length}</div>
+              </Card>
+            </div>
+
+            {results.updates.length > 0 && !results.applied && (
+              <>
+                <div style={{ maxHeight:250, overflow:"auto", marginBottom:16 }}>
+                  <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
+                    <thead>
+                      <tr style={{ background:C2 }}>
+                        <th style={{ padding:8, textAlign:"left", color:TX3, fontWeight:600 }}>Athlete</th>
+                        <th style={{ padding:8, textAlign:"left", color:TX3, fontWeight:600 }}>Current</th>
+                        <th style={{ padding:8, textAlign:"center", color:TX3 }}>→</th>
+                        <th style={{ padding:8, textAlign:"left", color:TX3, fontWeight:600 }}>New</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {results.updates.map((u, i) => (
+                        <tr key={i} style={{ borderBottom:`1px solid ${BD}` }}>
+                          <td style={{ padding:8, color:TX1, fontWeight:600 }}>{u.athlete.athlete || u.athlete.name}</td>
+                          <td style={{ padding:8 }}><Tag label={u.athlete.status} color={SCOL[u.athlete.status]||TX3}/></td>
+                          <td style={{ padding:8, textAlign:"center", color:TX3 }}>→</td>
+                          <td style={{ padding:8 }}><Tag label={u.status} color={SCOL[u.status]||T}/></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <Btn onClick={applyUpdates} size="lg" style={{ width:"100%", justifyContent:"center", background:`linear-gradient(135deg, ${GREEN}, ${T})` }}>
+                  ✅ Apply {results.updates.length} Status Updates
+                </Btn>
+              </>
+            )}
+
+            {results.applied && (
+              <div style={{ textAlign:"center", padding:16, background:GREEN+"15", borderRadius:12, border:`1px solid ${GREEN}33` }}>
+                <div style={{ fontSize:28, marginBottom:8 }}>🎉</div>
+                <div style={{ color:GREEN, fontSize:16, fontWeight:700 }}>All statuses updated!</div>
+              </div>
+            )}
+
+            {results.updates.length === 0 && (
+              <div style={{ textAlign:"center", padding:16, color:TX2 }}>
+                All athletes are already up to date! ✅
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── ATHLETES ────────────────────────────────────────────────────────────────
-function Athletes({ athletes, onSelect, onImport, bulkSelected, setBulkSelected, onBulkDelete, onBulkStatus, onDelete }) {
+function Athletes({ athletes, onSelect, onImport, bulkSelected, setBulkSelected, onBulkDelete, onBulkStatus, onDelete, onScanStatusUpdate }) {
   const [q, setQ]           = useState("");
   const [league, setLeague] = useState("All");
   const [status, setStatus] = useState("All");
   const [sort, setSort]     = useState({ col:"athlete", dir:"asc" });
   const [page, setPage]     = useState(1);
   const [showImport, setShowImport] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   const [bulkMode, setBulkMode] = useState(false);
   const PER = 25;
 
@@ -2231,6 +2687,7 @@ function Athletes({ athletes, onSelect, onImport, bulkSelected, setBulkSelected,
             icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>}>
             {bulkMode?"Exit Bulk":"Bulk"}
           </Btn>
+          <Btn variant="outline" size="sm" onClick={()=>setShowScanner(true)} icon="📧">Scan Emails</Btn>
           <Btn variant="outline" size="sm" onClick={exportCSV} icon="↓">Export CSV</Btn>
           <Btn variant="ghost" size="sm" onClick={()=>setShowImport(true)} icon="↑">Import CSV</Btn>
         </>}
@@ -2356,6 +2813,7 @@ function Athletes({ athletes, onSelect, onImport, bulkSelected, setBulkSelected,
         )}
       </Card>
       {showImport && <ImportCSVModal onClose={()=>setShowImport(false)} onImport={onImport} mode="athletes"/>}
+      {showScanner && <EmailHistoryScanner athletes={athletes} onStatusUpdate={onScanStatusUpdate} onClose={()=>setShowScanner(false)}/>}
     </div>
   );
 }
@@ -2600,7 +3058,7 @@ function Pipeline({ athletes, onUpdate, onSelect }) {
 }
 
 // ─── CONTACT EDIT PANEL ──────────────────────────────────────────────────────
-function ContactPanel({ contact, onClose, onSave }) {
+function ContactPanel({ contact, onClose, onSave, onDelete }) {
   const [ed, setEd] = useState({ ...contact });
   const [saving, setSaving] = useState(false);
   const cats = CONTACT_CATS;
@@ -2646,7 +3104,7 @@ function ContactPanel({ contact, onClose, onSave }) {
           {field("Phone","phone")}
           <div style={{ marginBottom:14 }}>
             <label style={{ color:TX3, fontSize:11, fontWeight:600, letterSpacing:"0.06em", textTransform:"uppercase", display:"block", marginBottom:5 }}>ASSIGNED TO</label>
-            <select value={ed.owner||"Carlos"} onChange={e=>setEd(p=>({...p,owner:e.target.value}))}
+            <select value={ed.owner||currentUser} onChange={e=>setEd(p=>({...p,owner:e.target.value}))}
               style={{ background:C2, border:`1px solid ${BD}`, borderRadius:8, padding:"9px 12px",
                 color:TX1, fontSize:13, width:"100%", outline:"none", fontFamily:"inherit" }}>
               {TEAM_MEMBERS.map(m=><option key={m}>{m}</option>)}
@@ -2654,6 +3112,8 @@ function ContactPanel({ contact, onClose, onSave }) {
           </div>
         </div>
         <div style={{ padding:"16px 24px", borderTop:`1px solid ${BD}`, display:"flex", gap:10 }}>
+          {onDelete && <Btn variant="danger" size="sm" onClick={()=>{if(window.confirm(`Delete contact "${ed.name||ed.email}"?`)){onDelete(ed);onClose();}}}
+            style={{justifyContent:"center"}}>🗑</Btn>}
           <Btn onClick={onClose} variant="ghost" style={{flex:1,justifyContent:"center"}}>Cancel</Btn>
           <Btn onClick={save} style={{flex:2,justifyContent:"center"}} disabled={saving}>{saving?"Saving...":"Save Changes"}</Btn>
         </div>
@@ -2663,7 +3123,7 @@ function ContactPanel({ contact, onClose, onSave }) {
 }
 
 // ─── CONTACTS (Grouped) ───────────────────────────────────────────────────────
-function Contacts({ contacts, onImport, onUpdateContact, onClearMember, onBulkCategoryChange, currentUser="Carlos" }) {
+function Contacts({ contacts, onImport, onUpdateContact, onDeleteContact, onClearMember, onBulkCategoryChange, currentUser="Carlos", onTokenCapture }) {
   const [q, setQ]         = useState("");
   const [showImport, setShowImport]   = useState(false);
   const [showGmail, setShowGmail]     = useState(false);
@@ -2684,14 +3144,14 @@ function Contacts({ contacts, onImport, onUpdateContact, onClearMember, onBulkCa
 
   const filtered = useMemo(()=>normalizedContacts.filter(c=>
     (filterCat==="All"||c.category===filterCat) &&
-    (filterOwner==="All"||(c.owner||"Carlos")===filterOwner) &&
+    (filterOwner==="All"||(c.owner||currentUser)===filterOwner) &&
     (!q || (c.name||"").toLowerCase().includes(q.toLowerCase()) || (c.email||"").toLowerCase().includes(q.toLowerCase()) || (c.company||"").toLowerCase().includes(q.toLowerCase()))
   ),[normalizedContacts,q,filterCat,filterOwner]);
 
   const ownerCounts = useMemo(() => {
     const m = {};
     TEAM_MEMBERS.forEach(n => { m[n] = 0; });
-    normalizedContacts.forEach(c => { const o = c.owner || "Carlos"; m[o] = (m[o]||0) + 1; });
+    normalizedContacts.forEach(c => { const o = c.owner || currentUser; m[o] = (m[o]||0) + 1; });
     return m;
   }, [normalizedContacts]);
 
@@ -2850,7 +3310,7 @@ function Contacts({ contacts, onImport, onUpdateContact, onClearMember, onBulkCa
                         <span style={{ color:T, fontSize:11 }}>{c.email}</span>
                       </td>
                       <td style={{ padding:"11px 16px" }}>
-                        <Tag label={c.owner||"Carlos"} color={MEMBER_COLORS[c.owner||"Carlos"]||T}/>
+                        <Tag label={c.owner||currentUser} color={MEMBER_COLORS[c.owner||currentUser]||T}/>
                       </td>
                       <td style={{ padding:"11px 16px" }}>
                         <Tag label={c.category||"Other"} color={PCOLS[cats.indexOf(c.category||"Other")%PCOLS.length]}/>
@@ -2868,6 +3328,12 @@ function Contacts({ contacts, onImport, onUpdateContact, onClearMember, onBulkCa
                             borderRadius:6, padding:"4px 10px", fontSize:11, cursor:"pointer", fontFamily:"inherit" }}>
                             Email
                           </button>
+                          {onDeleteContact && <button onClick={e=>{e.stopPropagation();
+                            if(window.confirm(`Delete "${c.name||c.email}"?`)) onDeleteContact(c);
+                          }} style={{ background:"none", border:`1px solid ${WINE}44`, color:WINE,
+                            borderRadius:6, padding:"4px 10px", fontSize:11, cursor:"pointer", fontFamily:"inherit" }}>
+                            ✕
+                          </button>}
                         </div>
                       </td>
                     </tr>
@@ -2887,11 +3353,11 @@ function Contacts({ contacts, onImport, onUpdateContact, onClearMember, onBulkCa
       )}
 
       {showImport && <ImportCSVModal onClose={()=>setShowImport(false)} onImport={onImport} mode="contacts"/>}
-      {showGmail  && <GmailConnectModal onClose={()=>setShowGmail(false)} defaultOwner={currentUser} onImport={(rows, mode) => {
+      {showGmail  && <GmailConnectModal onClose={()=>setShowGmail(false)} defaultOwner={currentUser} onTokenCapture={onTokenCapture} onImport={(rows, mode) => {
         const tagged = rows.map(r => ({ ...r, owner: r.owner || currentUser }));
         onImport(tagged, mode);
       }}/>}
-      {editContact && <ContactPanel contact={editContact} onClose={()=>setEditContact(null)} onSave={onUpdateContact}/>}
+      {editContact && <ContactPanel contact={editContact} onClose={()=>setEditContact(null)} onSave={onUpdateContact} onDelete={onDeleteContact}/>}
     </div>
   );
 }
@@ -2916,7 +3382,7 @@ function Export({ athletes, contacts }) {
       : ["Name","Company","Category","Email","Owner","Source"];
     const rows = type==="athletes"
       ? data.map(a=>[a.athlete,a.team,a.league,a.agency,a.agent,a.email,a.status,a.notes||""])
-      : data.map(c=>[c.name,c.company||"",c.category||"",c.email||"",c.owner||"Carlos",c.source||""]);
+      : data.map(c=>[c.name,c.company||"",c.category||"",c.email||"",c.owner||"",c.source||""]);
     const csv = [headers,...rows].map(r=>r.map(v=>`"${(v||"").replace(/"/g,'""')}"`).join(",")).join("\n");
     const a   = document.createElement("a");
     a.href    = "data:text/csv;charset=utf-8,\uFEFF"+encodeURIComponent(csv);
@@ -3117,40 +3583,47 @@ function Activity({ athletes, activityLog = [], onSelect }) {
 // ─── APP SHELL ────────────────────────────────────────────────────────────────
 const QUICK_ACCESS_KEY = "atlaua_quick_access";
 const TEAM_PASSWORD = "AtlauaCRM2025!";
+const UNIVERSAL_PIN = "Atlaua2026!";
 
 // ─── LOGIN SCREEN ───────────────────────────────────────────────────────────
 function LoginScreen({ onAuth }) {
   const [loading, setLoading] = useState("");
   const [error, setError] = useState("");
+  const [selectedEmail, setSelectedEmail] = useState(null);
+  const [pin, setPin] = useState("");
+  const [showPin, setShowPin] = useState(false);
 
-  const quickAccess = async (em) => {
-    setLoading(em);
+  const handleSelectMember = (em) => {
+    setSelectedEmail(em);
+    setPin("");
     setError("");
-    localStorage.setItem(QUICK_ACCESS_KEY, em);
+  };
+
+  const handleLogin = async () => {
+    if (pin !== UNIVERSAL_PIN) {
+      setError("Incorrect password. Try again.");
+      setPin("");
+      return;
+    }
+    setLoading(selectedEmail);
+    setError("");
+    localStorage.setItem(QUICK_ACCESS_KEY, selectedEmail);
     try {
-      // Try signing in with Supabase (real session = RLS works for delete/insert/update)
-      const { data, error: signInErr } = await supabase.auth.signInWithPassword({ email: em, password: TEAM_PASSWORD });
-      if (data?.session) {
-        onAuth(data.session);
-        return;
-      }
-      // If account doesn't exist, create it then sign in
+      const { data, error: signInErr } = await supabase.auth.signInWithPassword({ email: selectedEmail, password: TEAM_PASSWORD });
+      if (data?.session) { onAuth(data.session); return; }
       if (signInErr) {
         const { error: signUpErr } = await supabase.auth.signUp({
-          email: em, password: TEAM_PASSWORD,
-          options: { data: { team_member: TEAM_EMAIL_MAP[em] || em } }
+          email: selectedEmail, password: TEAM_PASSWORD,
+          options: { data: { team_member: TEAM_EMAIL_MAP[selectedEmail] || selectedEmail } }
         });
         if (!signUpErr) {
-          // Try sign in again after signup
-          const { data: d2 } = await supabase.auth.signInWithPassword({ email: em, password: TEAM_PASSWORD });
+          const { data: d2 } = await supabase.auth.signInWithPassword({ email: selectedEmail, password: TEAM_PASSWORD });
           if (d2?.session) { onAuth(d2.session); return; }
         }
       }
-      // Fallback: use quick access session (reads work, writes may fail with RLS)
-      onAuth({ user: { email: em }, quick_access: true });
+      onAuth({ user: { email: selectedEmail }, quick_access: true });
     } catch {
-      // Network error etc — still let them in with quick access
-      onAuth({ user: { email: em }, quick_access: true });
+      onAuth({ user: { email: selectedEmail }, quick_access: true });
     }
   };
 
@@ -3173,53 +3646,114 @@ function LoginScreen({ onAuth }) {
         </div>
         <div style={{ background:C1, border:`1px solid ${BD2}`, borderRadius:20, padding:"36px 32px",
           boxShadow:`0 24px 64px rgba(0,0,0,0.5), 0 0 40px ${T}08` }}>
-          <h2 style={{ margin:"0 0 6px", color:TX1, fontSize:20, fontWeight:800, textAlign:"center" }}>
-            Welcome back
-          </h2>
-          <p style={{ margin:"0 0 28px", color:TX2, fontSize:13, textAlign:"center" }}>
-            Select your profile to continue
-          </p>
 
-          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-            {ALLOWED_EMAILS.map(em => {
-              const name = TEAM_EMAIL_MAP[em] || em;
-              const mc = MEMBER_COLORS[name] || T;
-              const isLoading = loading === em;
-              return (
-                <button key={em} onClick={() => quickAccess(em)} disabled={!!loading}
-                  style={{
-                    display:"flex", alignItems:"center", gap:16, padding:"16px 20px",
-                    background: isLoading ? mc + "22" : C2,
-                    border: `1.5px solid ${isLoading ? mc : BD}`,
-                    borderRadius:14, cursor: loading ? "wait" : "pointer",
-                    transition:"all 0.2s", fontFamily:"inherit",
-                    opacity: loading && !isLoading ? 0.4 : 1,
-                  }}
-                  onMouseEnter={e => { if (!loading) { e.currentTarget.style.background = mc + "18"; e.currentTarget.style.borderColor = mc + "66"; e.currentTarget.style.transform = "translateY(-1px)"; } }}
-                  onMouseLeave={e => { if (!loading) { e.currentTarget.style.background = isLoading ? mc + "22" : C2; e.currentTarget.style.borderColor = isLoading ? mc : BD; e.currentTarget.style.transform = "none"; } }}>
-                  <div style={{
-                    width:44, height:44, borderRadius:"50%",
-                    background:`linear-gradient(135deg, ${mc}33, ${mc}11)`,
-                    border:`2px solid ${mc}55`,
-                    display:"flex", alignItems:"center", justifyContent:"center",
-                    color:mc, fontSize:18, fontWeight:800, flexShrink:0
-                  }}>{name[0]}</div>
-                  <div style={{ flex:1, textAlign:"left" }}>
-                    <div style={{ color:TX1, fontSize:16, fontWeight:700 }}>{name}</div>
-                    <div style={{ color:TX2, fontSize:12 }}>{em}</div>
-                  </div>
-                  {isLoading ? (
-                    <div style={{ color:mc, fontSize:12, fontWeight:600 }}>Loading...</div>
-                  ) : (
+          {!selectedEmail ? (<>
+            <h2 style={{ margin:"0 0 6px", color:TX1, fontSize:20, fontWeight:800, textAlign:"center" }}>
+              Welcome back
+            </h2>
+            <p style={{ margin:"0 0 28px", color:TX2, fontSize:13, textAlign:"center" }}>
+              Select your profile to continue
+            </p>
+            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              {ALLOWED_EMAILS.map(em => {
+                const name = TEAM_EMAIL_MAP[em] || em;
+                const mc = MEMBER_COLORS[name] || T;
+                return (
+                  <button key={em} onClick={() => handleSelectMember(em)}
+                    style={{
+                      display:"flex", alignItems:"center", gap:16, padding:"16px 20px",
+                      background: C2, border: `1.5px solid ${BD}`,
+                      borderRadius:14, cursor:"pointer", transition:"all 0.2s", fontFamily:"inherit",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = mc + "18"; e.currentTarget.style.borderColor = mc + "66"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = C2; e.currentTarget.style.borderColor = BD; e.currentTarget.style.transform = "none"; }}>
+                    <div style={{
+                      width:44, height:44, borderRadius:"50%",
+                      background:`linear-gradient(135deg, ${mc}33, ${mc}11)`,
+                      border:`2px solid ${mc}55`,
+                      display:"flex", alignItems:"center", justifyContent:"center",
+                      color:mc, fontSize:18, fontWeight:800, flexShrink:0
+                    }}>{name[0]}</div>
+                    <div style={{ flex:1, textAlign:"left" }}>
+                      <div style={{ color:TX1, fontSize:16, fontWeight:700 }}>{name}</div>
+                      <div style={{ color:TX2, fontSize:12 }}>{em}</div>
+                    </div>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={TX3}
                       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="9 18 15 12 9 6"/>
                     </svg>
-                  )}
-                </button>
+                  </button>
+                );
+              })}
+            </div>
+          </>) : (<>
+            <button onClick={() => { setSelectedEmail(null); setPin(""); setError(""); }}
+              style={{ background:"none", border:"none", color:TX2, fontSize:13, cursor:"pointer",
+                display:"flex", alignItems:"center", gap:6, marginBottom:20, fontFamily:"inherit", padding:0 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+              Back
+            </button>
+            {(() => {
+              const name = TEAM_EMAIL_MAP[selectedEmail] || selectedEmail;
+              const mc = MEMBER_COLORS[name] || T;
+              return (
+                <div style={{ textAlign:"center", marginBottom:28 }}>
+                  <div style={{
+                    width:64, height:64, borderRadius:"50%", margin:"0 auto 14px",
+                    background:`linear-gradient(135deg, ${mc}33, ${mc}11)`,
+                    border:`3px solid ${mc}55`,
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                    color:mc, fontSize:26, fontWeight:800
+                  }}>{name[0]}</div>
+                  <div style={{ color:TX1, fontSize:18, fontWeight:700 }}>{name}</div>
+                  <div style={{ color:TX2, fontSize:12, marginTop:2 }}>{selectedEmail}</div>
+                </div>
               );
-            })}
-          </div>
+            })()}
+            <div style={{ marginBottom:8, color:TX2, fontSize:13, fontWeight:600 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign:"-2px", marginRight:6 }}>
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+              </svg>
+              Enter team password
+            </div>
+            <div style={{ position:"relative" }}>
+              <input
+                type={showPin ? "text" : "password"}
+                value={pin}
+                onChange={e => setPin(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") handleLogin(); }}
+                placeholder="Password"
+                autoFocus
+                style={{
+                  width:"100%", padding:"14px 48px 14px 16px", borderRadius:12,
+                  background:C2, border:`1.5px solid ${BD}`, color:TX1,
+                  fontSize:15, fontFamily:"inherit", outline:"none",
+                  boxSizing:"border-box", transition:"border-color 0.2s"
+                }}
+                onFocus={e => e.target.style.borderColor = T}
+                onBlur={e => e.target.style.borderColor = BD}
+              />
+              <button onClick={() => setShowPin(!showPin)}
+                style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)",
+                  background:"none", border:"none", cursor:"pointer", color:TX3, padding:4 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  {showPin ? (<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>) : (<><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></>)}
+                </svg>
+              </button>
+            </div>
+            <button onClick={handleLogin} disabled={!pin || !!loading}
+              style={{
+                width:"100%", padding:"14px", marginTop:16, borderRadius:12,
+                background: loading ? T + "66" : `linear-gradient(135deg, ${T}, ${T}cc)`,
+                border:"none", color:BG, fontSize:15, fontWeight:700,
+                cursor: (!pin || loading) ? "not-allowed" : "pointer",
+                fontFamily:"inherit", transition:"all 0.2s",
+                opacity: !pin ? 0.5 : 1,
+                boxShadow: pin ? `0 4px 20px ${T}44` : "none"
+              }}>
+              {loading ? "Signing in..." : "Sign In"}
+            </button>
+          </>)}
 
           {error && (
             <div style={{ background:WINE+"22", border:`1px solid ${WINE}44`, borderRadius:10,
@@ -3229,7 +3763,7 @@ function LoginScreen({ onAuth }) {
           )}
         </div>
         <div style={{ textAlign:"center", marginTop:20, color:TX3, fontSize:11 }}>
-          Only authorized team members can access this CRM
+          Protected access — authorized team members only
         </div>
       </div>
     </div>
@@ -3303,6 +3837,11 @@ export default function App() {
     setActivityLog(prev => [entry, ...prev].slice(0, 500));
   }, []);
 
+  // ─── AUTOMATIC GMAIL TRACKING ───────────────────────────────────────────────
+  const { saveTokenFromManualSync } = useGmailAutoTracker({
+    currentEmail, currentUser, athletes, contacts, setContacts, setAthletes, logActivity
+  });
+
   // Normalize Supabase row → local format (DB uses "name", app uses "athlete")
   const fromDB = (row) => ({ ...row, athlete: row.name || "" });
   // Normalize local → Supabase format
@@ -3327,15 +3866,27 @@ export default function App() {
             athlete:r[0],team:r[1],league:r[2],agency:r[3],agent:r[4],email:r[5],status:r[6],notes:""
           })));
         }
-        const { data:con } = await supabase.from("contacts").select("*");
-        if(con) {
+        // Fetch ALL contacts (Supabase default limit is 1000, so paginate)
+        let allContacts = [];
+        let from = 0;
+        const PAGE = 1000;
+        while (true) {
+          const { data: batch } = await supabase.from("contacts").select("*").range(from, from + PAGE - 1);
+          if (!batch || batch.length === 0) break;
+          allContacts = allContacts.concat(batch);
+          if (batch.length < PAGE) break;
+          from += PAGE;
+        }
+        console.log(`[Init] Loaded ${allContacts.length} total contacts from Supabase`);
+        const con = allContacts;
+        if(con.length > 0) {
           const needsCatFix = [];
           const mapped = con.map(c => {
             const current = c.category || "Other";
             const catOk = CONTACT_CATS.includes(current);
             const newCat = catOk ? current : categorizeEmail(c.email || "", c.name || "", c.company || "");
             if (!catOk) needsCatFix.push({ id: c.id, category: newCat });
-            return { ...c, athlete: c.name || "", owner: c.owner || "Carlos", category: newCat };
+            return { ...c, athlete: c.name || "", owner: c.owner || currentUser, category: newCat };
           });
           setContacts(mapped);
           // Fix categories in Supabase for contacts that have invalid categories (once per session)
@@ -3533,7 +4084,7 @@ export default function App() {
   }, [athletes, bulkSelected, logActivity]);
 
   const clearMemberContacts = useCallback(async (member) => {
-    const toDelete = contacts.filter(c => (c.owner || "Carlos") === member);
+    const toDelete = contacts.filter(c => (c.owner || currentUser) === member);
     if (!toDelete.length || !window.confirm(`Delete all ${toDelete.length} contacts for ${member}? This cannot be undone.`)) return;
     try {
       // Delete by owner column in Supabase + fallback to ID batches
@@ -3546,7 +4097,7 @@ export default function App() {
           await supabase.from("contacts").delete().in("id", batch);
         }
       }
-      setContacts(prev => prev.filter(c => (c.owner || "Carlos") !== member));
+      setContacts(prev => prev.filter(c => (c.owner || currentUser) !== member));
       logActivity("Cleared contacts", `${toDelete.length} contacts for ${member}`);
     } catch (err) {
       alert(`Error clearing contacts: ${err.message}`);
@@ -3593,10 +4144,10 @@ export default function App() {
             if (prev.some(c => c.id === payload.new.id)) return prev;
             const cat = CONTACT_CATS.includes(payload.new.category) ? payload.new.category
               : categorizeEmail(payload.new.email||"", payload.new.name||"", payload.new.company||"");
-            return [{ ...payload.new, athlete: payload.new.name, owner: payload.new.owner || "Carlos", category: cat }, ...prev];
+            return [{ ...payload.new, athlete: payload.new.name, owner: payload.new.owner || currentUser, category: cat }, ...prev];
           });
         } else if (payload.eventType === "UPDATE" && payload.new) {
-          setContacts(prev => prev.map(c => c.id === payload.new.id ? { ...payload.new, athlete: payload.new.name, owner: payload.new.owner || c.owner || "Carlos" } : c));
+          setContacts(prev => prev.map(c => c.id === payload.new.id ? { ...payload.new, athlete: payload.new.name, owner: payload.new.owner || c.owner || currentUser } : c));
         } else if (payload.eventType === "DELETE" && payload.old) {
           setContacts(prev => prev.filter(c => c.id !== payload.old.id));
         }
@@ -3828,6 +4379,23 @@ export default function App() {
             </div>
           )}
           <div style={{ marginLeft:"auto", display:"flex", gap:isMobile?8:12, alignItems:"center" }}>
+            {/* Auto-tracker status indicator */}
+            {(() => {
+              const hasToken = !!localStorage.getItem(AUTO_TRACK_TOKEN_PREFIX + currentEmail);
+              const lastSync = parseInt(localStorage.getItem(AUTO_TRACK_STORAGE_PREFIX + currentEmail) || "0", 10);
+              const isRecent = lastSync > 0 && (Date.now() - lastSync) < AUTO_TRACK_INTERVAL * 2;
+              return hasToken ? (
+                <div title={`Auto-tracking active. Last: ${lastSync ? new Date(lastSync).toLocaleTimeString() : 'never'}`}
+                  style={{ display:"flex", alignItems:"center", gap:5, padding:"4px 10px",
+                    background: isRecent ? GREEN+"18" : GOLD+"18",
+                    border:`1px solid ${isRecent ? GREEN+"44" : GOLD+"44"}`,
+                    borderRadius:20, fontSize:10, fontWeight:600,
+                    color: isRecent ? GREEN : GOLD, whiteSpace:"nowrap" }}>
+                  <div style={{ width:6, height:6, borderRadius:"50%", background: isRecent ? GREEN : GOLD, flexShrink:0 }}/>
+                  {isMobile ? "AT" : "Auto-Track"}
+                </div>
+              ) : null;
+            })()}
             <Btn size="sm" onClick={()=>setShowAdd(true)} icon="+">{isMobile?"":"New Record"}</Btn>
             {!isMobile && <span style={{ color:TX2, fontSize:12, fontWeight:500 }}>{currentUser}</span>}
             <div onClick={signOut} title={`Signed in as ${currentUser} (${currentEmail})\nClick to sign out`}
@@ -3844,11 +4412,12 @@ export default function App() {
           {page==="Dashboard" && <Dashboard athletes={globalFiltered.athletes} onSelect={setSel}/>}
           {page==="Athletes"  && <Athletes  athletes={globalFiltered.athletes} onSelect={setSel} onImport={importBatch}
             bulkSelected={bulkSelected} setBulkSelected={setBulkSelected}
-            onBulkDelete={bulkDeleteAthletes} onBulkStatus={bulkUpdateStatus} onDelete={a=>setDeleteConfirm({type:"athlete",item:a})}/>}
+            onBulkDelete={bulkDeleteAthletes} onBulkStatus={bulkUpdateStatus} onDelete={a=>setDeleteConfirm({type:"athlete",item:a})}
+            onScanStatusUpdate={(id, newStatus) => setAthletes(prev => prev.map(a => a.id === id ? { ...a, status: newStatus } : a))}/>}
           {page==="Agencies"  && <Agencies  athletes={globalFiltered.athletes} onSelect={setSel}/>}
           {page==="Teams"     && <Teams     athletes={globalFiltered.athletes} onSelect={setSel}/>}
           {page==="Pipeline"  && <Pipeline  athletes={globalFiltered.athletes} onUpdate={upd} onSelect={setSel}/>}
-          {page==="Contacts"  && <Contacts  contacts={globalFiltered.contacts} onImport={importBatch} onUpdateContact={updContact} onClearMember={clearMemberContacts} onBulkCategoryChange={bulkCategoryChange} currentUser={currentUser}/>}
+          {page==="Contacts"  && <Contacts  contacts={globalFiltered.contacts} onImport={importBatch} onUpdateContact={updContact} onDeleteContact={deleteContact} onClearMember={clearMemberContacts} onBulkCategoryChange={bulkCategoryChange} currentUser={currentUser} onTokenCapture={saveTokenFromManualSync}/>}
           {page==="Activity"  && <Activity  athletes={athletes} activityLog={activityLog} onSelect={setSel}/>}
           {page==="Export"    && <Export    athletes={globalFiltered.athletes} contacts={globalFiltered.contacts}/>}
         </main>
