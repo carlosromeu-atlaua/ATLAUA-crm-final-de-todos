@@ -3583,7 +3583,7 @@ function Activity({ athletes, activityLog = [], onSelect }) {
 // ─── APP SHELL ────────────────────────────────────────────────────────────────
 const QUICK_ACCESS_KEY = "atlaua_quick_access";
 const TEAM_PASSWORD = "AtlauaCRM2025!";
-const UNIVERSAL_PIN = "Atlaua2026!";
+const UNIVERSAL_PIN = "Atlaua#Jagu4r$2026!";
 
 // ─── LOGIN SCREEN ───────────────────────────────────────────────────────────
 function LoginScreen({ onAuth }) {
