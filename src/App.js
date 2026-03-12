@@ -720,7 +720,7 @@ const R_SM = 8, R_MD = 12, R_LG = 16, R_XL = 20, R_PILL = 100;
 
 // ─── THEME SYSTEM ────────────────────────────────────────────────────────────
 const DARK_THEME = { BG:"#0A0A0A",SB:"#060606",C1:"#111111",C2:"#1A1A1A",C3:"#222222",BD:"rgba(255,248,232,0.08)",BD2:"rgba(4,189,183,0.2)",TX1:"#FFFFFF",TX2:"rgba(255,248,232,0.55)",TX3:"rgba(255,248,232,0.28)",SH_SM:"0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2)",SH_MD:"0 4px 16px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.2)",SH_LG:"0 12px 40px rgba(0,0,0,0.45), 0 4px 12px rgba(0,0,0,0.3)" };
-const LIGHT_THEME = { BG:"#F5F5F7",SB:"#FFFFFF",C1:"#FFFFFF",C2:"#F0F0F2",C3:"#E4E4E7",BD:"rgba(0,0,0,0.09)",BD2:"rgba(4,189,183,0.18)",TX1:"#1A1A2E",TX2:"rgba(0,0,0,0.55)",TX3:"rgba(0,0,0,0.32)",SH_SM:"0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",SH_MD:"0 4px 16px rgba(0,0,0,0.07), 0 2px 6px rgba(0,0,0,0.04)",SH_LG:"0 12px 40px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.06)" };
+const LIGHT_THEME = { BG:"#F0F2F5",SB:"#FFFFFF",C1:"#FFFFFF",C2:"#F7F7F9",C3:"#EEEEF1",BD:"rgba(0,0,0,0.12)",BD2:"rgba(4,160,155,0.25)",TX1:"#111827",TX2:"#4B5563",TX3:"#6B7280",SH_SM:"0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)",SH_MD:"0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.05)",SH_LG:"0 12px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.08)" };
 function applyTheme(mode) {
   const t = mode==="light" ? LIGHT_THEME : DARK_THEME;
   BG=t.BG;SB=t.SB;C1=t.C1;C2=t.C2;C3=t.C3;BD=t.BD;BD2=t.BD2;TX1=t.TX1;TX2=t.TX2;TX3=t.TX3;SH_SM=t.SH_SM;SH_MD=t.SH_MD;SH_LG=t.SH_LG;
