@@ -678,12 +678,14 @@ const TODAY   = new Date().toISOString().split("T")[0];
 const LEAGUES = ["NFL","NBA","NHL","MLB","UFC"];
 const STATUSES= ["Contacted","Negotiating","Proposal Sent","Closed Won","Closed Lost","Pending"];
 const ICONS   = {NFL:"",NBA:"",NHL:"",MLB:"",UFC:""};
-const TEAM_MEMBERS = ["Carlos","Maya","Adrian","Info Atlaua"];
+const TEAM_MEMBERS = ["Carlos","Maya","Adrian","Info Atlaua","Stephen","Felix"];
 const TEAM_EMAIL_MAP = {
   "carlosromeu@atlaua.de":"Carlos",
   "mayakoar@atlaua.de":"Maya",
   "adriangoransch@atlaua.de":"Adrian",
-  "info@atlaua.de":"Info Atlaua"
+  "info@atlaua.de":"Info Atlaua",
+  "stephenwalden@atlaualabs.com":"Stephen",
+  "felix@atlaua.de":"Felix"
 };
 const ALLOWED_EMAILS = Object.keys(TEAM_EMAIL_MAP);
 
@@ -696,29 +698,59 @@ const GREEN = "#2FC88A";   // Success
 const ROSE  = "#E84C8B";   // Rose accent
 const PURP  = "#7B6BD6";   // Purple accent
 
-const BG    = "#0A0A0A";   // Near-black background
-const SB    = "#060606";   // Sidebar dark
-const C1    = "#111111";   // Card level 1
-const C2    = "#1A1A1A";   // Card level 2
-const C3    = "#222222";   // Card level 3
-const BD    = "rgba(255,248,232,0.08)";
-const BD2   = "rgba(4,189,183,0.2)";
-const TX1   = "#FFFFFF";
-const TX2   = "rgba(255,248,232,0.55)";
-const TX3   = "rgba(255,248,232,0.28)";
+// eslint-disable-next-line no-unused-vars
+let BG    = "#0A0A0A";   // Near-black background
+let SB    = "#060606";   // Sidebar dark
+let C1    = "#111111";   // Card level 1
+let C2    = "#1A1A1A";   // Card level 2
+let C3    = "#222222";   // Card level 3
+let BD    = "rgba(255,248,232,0.08)";
+let BD2   = "rgba(4,189,183,0.2)";
+let TX1   = "#FFFFFF";
+let TX2   = "rgba(255,248,232,0.55)";
+let TX3   = "rgba(255,248,232,0.28)";
 
 // Shadow scale
-const SH_SM = "0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2)";
-const SH_MD = "0 4px 16px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.2)";
-const SH_LG = "0 12px 40px rgba(0,0,0,0.45), 0 4px 12px rgba(0,0,0,0.3)";
+let SH_SM = "0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2)";
+let SH_MD = "0 4px 16px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.2)";
+let SH_LG = "0 12px 40px rgba(0,0,0,0.45), 0 4px 12px rgba(0,0,0,0.3)";
 const SH_GLOW = (c) => `0 0 24px ${c}18, 0 8px 32px rgba(0,0,0,0.4)`;
 // Radius scale
 const R_SM = 8, R_MD = 12, R_LG = 16, R_XL = 20, R_PILL = 100;
 
+// ─── THEME SYSTEM ────────────────────────────────────────────────────────────
+const DARK_THEME = { BG:"#0A0A0A",SB:"#060606",C1:"#111111",C2:"#1A1A1A",C3:"#222222",BD:"rgba(255,248,232,0.08)",BD2:"rgba(4,189,183,0.2)",TX1:"#FFFFFF",TX2:"rgba(255,248,232,0.55)",TX3:"rgba(255,248,232,0.28)",SH_SM:"0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2)",SH_MD:"0 4px 16px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.2)",SH_LG:"0 12px 40px rgba(0,0,0,0.45), 0 4px 12px rgba(0,0,0,0.3)" };
+const LIGHT_THEME = { BG:"#F5F5F7",SB:"#FFFFFF",C1:"#FFFFFF",C2:"#F0F0F2",C3:"#E4E4E7",BD:"rgba(0,0,0,0.09)",BD2:"rgba(4,189,183,0.18)",TX1:"#1A1A2E",TX2:"rgba(0,0,0,0.55)",TX3:"rgba(0,0,0,0.32)",SH_SM:"0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",SH_MD:"0 4px 16px rgba(0,0,0,0.07), 0 2px 6px rgba(0,0,0,0.04)",SH_LG:"0 12px 40px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.06)" };
+function applyTheme(mode) {
+  const t = mode==="light" ? LIGHT_THEME : DARK_THEME;
+  BG=t.BG;SB=t.SB;C1=t.C1;C2=t.C2;C3=t.C3;BD=t.BD;BD2=t.BD2;TX1=t.TX1;TX2=t.TX2;TX3=t.TX3;SH_SM=t.SH_SM;SH_MD=t.SH_MD;SH_LG=t.SH_LG;
+  if(typeof document!=="undefined"){document.body.style.background=BG;document.documentElement.style.colorScheme=mode;}
+}
+const _savedTheme=(typeof localStorage!=="undefined"&&localStorage.getItem("atlaua_theme"))||"dark";
+if(_savedTheme==="light") applyTheme("light");
+
+// ─── TOAST SYSTEM ────────────────────────────────────────────────────────────
+let _toastPush = null;
+function showToast(msg, type="info") { if(_toastPush) _toastPush(msg, type); }
+function ToastContainer() {
+  const [toasts, setToasts] = useState([]);
+  useEffect(()=>{_toastPush=(msg,type)=>{const id=Date.now()+Math.random();setToasts(p=>[...p,{id,msg,type}]);setTimeout(()=>setToasts(p=>p.filter(t=>t.id!==id)),4500);};return()=>{_toastPush=null;};},[]);
+  const colors={success:GREEN,error:WINE,warning:GOLD,info:T};
+  const icons={success:"\u2713",error:"\u2717",warning:"\u26A0",info:"\u2139"};
+  if(!toasts.length) return null;
+  return (<div style={{position:"fixed",top:20,right:20,zIndex:9999,display:"flex",flexDirection:"column",gap:10,maxWidth:380}}>
+    {toasts.map(t=>{const c=colors[t.type]||T;return(
+      <div key={t.id} style={{background:C1,border:`1px solid ${c}55`,borderRadius:12,padding:"12px 16px",boxShadow:`0 8px 32px rgba(0,0,0,0.4), 0 0 12px ${c}22`,display:"flex",alignItems:"center",gap:10,animation:"fadeInUp 0.3s ease",backdropFilter:"blur(12px)"}}>
+        <div style={{width:28,height:28,borderRadius:8,background:c+"22",border:`1px solid ${c}44`,display:"flex",alignItems:"center",justifyContent:"center",color:c,fontSize:14,fontWeight:700,flexShrink:0}}>{icons[t.type]}</div>
+        <div style={{flex:1,color:TX1,fontSize:13,fontWeight:500,lineHeight:1.4}}>{t.msg}</div>
+        <button onClick={()=>setToasts(p=>p.filter(x=>x.id!==t.id))} style={{background:"none",border:"none",color:TX3,cursor:"pointer",fontSize:16,padding:2,flexShrink:0}}>{"\u2715"}</button>
+      </div>);})}</div>);
+}
+
 const SCOL  = { Contacted:T, Negotiating:GOLD, "Proposal Sent":PURP, "Closed Won":GREEN, "Closed Lost":"#444", Pending:TX3 };
 const PCOLS = [T, WINE, GOLD, PURP, ROSE, GREEN];
 const LCOLS = { NFL:WINE, NBA:T, NHL:PURP, MLB:GREEN, UFC:GOLD };
-const MEMBER_COLORS = { Carlos:T, Maya:ROSE, Adrian:PURP, "Info Atlaua":GOLD };
+const MEMBER_COLORS = { Carlos:T, Maya:ROSE, Adrian:PURP, "Info Atlaua":GOLD, Stephen:GREEN, Felix:"#FF6B35" };
 
 // ─── GOOGLE OAUTH ─────────────────────────────────────────────────────────────
 // IMPORTANT: Replace with your own Google OAuth client ID from console.cloud.google.com
@@ -781,7 +813,7 @@ const CONTACT_CATS = [
   "Investors & Capital","Athletes & Ambassadors","Strategic Partners","Media & Press","Community & Club Members",
   "Retail & Distribution",
   "Manufacturing & Production","Suppliers","Logistics & Fulfillment",
-  "Advisors & Mentors","Internal Network",
+  "Advisors & Mentors","Consulting / Outsourced Services","Internal Network",
   "Other"
 ];
 
@@ -1948,8 +1980,47 @@ function Panel({ a, onClose, onSave, onDelete, logActivity }) {
               {field("Team","team")}
               {field("League","league")}
               {field("Status","status")}
+              {(ed.status==="Closed Won"||ed.status==="Closed Lost") && (
+                <div style={{ marginBottom:14 }}>
+                  <label style={{ color:TX3, fontSize:11, fontWeight:600, letterSpacing:"0.06em", textTransform:"uppercase", display:"block", marginBottom:5 }}>
+                    {ed.status==="Closed Won" ? "WIN REASON" : "LOST REASON"}
+                  </label>
+                  <input value={ed.close_reason||""} onChange={e=>setEd(p=>({...p,close_reason:e.target.value}))}
+                    placeholder={ed.status==="Closed Won"?"e.g. Great brand fit, competitive pricing":"e.g. Budget constraints, went with competitor"}
+                    style={{ background:C2, border:`1px solid ${BD}`, borderRadius:8, padding:"9px 12px",
+                      color:TX1, fontSize:13, width:"100%", boxSizing:"border-box", outline:"none", fontFamily:"inherit" }}/>
+                </div>
+              )}
               {field("Agency","agency")}
               {field("Deal Value ($)","deal_value","number")}
+              <div style={{ marginBottom:14 }}>
+                <label style={{ color:TX3, fontSize:11, fontWeight:600, letterSpacing:"0.06em", textTransform:"uppercase", display:"block", marginBottom:5 }}>ASSIGNED TO</label>
+                <select value={ed.owner||""} onChange={e=>setEd(p=>({...p,owner:e.target.value}))}
+                  style={{ background:C2, border:`1px solid ${BD}`, borderRadius:8, padding:"9px 12px",
+                    color:TX1, fontSize:13, width:"100%", outline:"none", fontFamily:"inherit" }}>
+                  <option value="">Unassigned</option>
+                  {TEAM_MEMBERS.map(m=><option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+              <div style={{ borderTop:`1px solid ${BD}`, paddingTop:14, marginTop:6 }}>
+                <label style={{ color:TX3, fontSize:11, fontWeight:600, letterSpacing:"0.06em", display:"block", marginBottom:10 }}>SOCIAL LINKS</label>
+                <div style={{ display:"flex", gap:8, marginBottom:8 }}>
+                  <div style={{ width:32, display:"flex", alignItems:"center", justifyContent:"center", color:ROSE, fontSize:16 }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+                  </div>
+                  <input value={ed.instagram||""} onChange={e=>setEd(p=>({...p,instagram:e.target.value}))}
+                    placeholder="Instagram handle" style={{ flex:1, background:C2, border:`1px solid ${BD}`, borderRadius:8, padding:"8px 12px",
+                      color:TX1, fontSize:13, outline:"none", fontFamily:"inherit" }}/>
+                </div>
+                <div style={{ display:"flex", gap:8 }}>
+                  <div style={{ width:32, display:"flex", alignItems:"center", justifyContent:"center", color:T, fontSize:16 }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                  </div>
+                  <input value={ed.twitter||""} onChange={e=>setEd(p=>({...p,twitter:e.target.value}))}
+                    placeholder="X / Twitter handle" style={{ flex:1, background:C2, border:`1px solid ${BD}`, borderRadius:8, padding:"8px 12px",
+                      color:TX1, fontSize:13, outline:"none", fontFamily:"inherit" }}/>
+                </div>
+              </div>
             </>
           )}
           {tab==="contact" && (
@@ -2237,6 +2308,36 @@ function Dashboard({ athletes, onSelect }) {
     value: byStatus[s]||0, color: SCOL[s]
   }));
 
+  // Revenue metrics
+  const revenue = useMemo(()=>{
+    const won = dashAthletes.filter(a=>a.status==="Closed Won");
+    const neg = dashAthletes.filter(a=>a.status==="Negotiating"||a.status==="Proposal Sent");
+    const totalWon = won.reduce((s,a)=>s+(Number(a.deal_value)||0),0);
+    const totalPipeline = neg.reduce((s,a)=>s+(Number(a.deal_value)||0),0);
+    const avgDeal = won.length ? Math.round(totalWon/won.length) : 0;
+    return { totalWon, totalPipeline, avgDeal, wonCount:won.length };
+  },[dashAthletes]);
+
+  // Conversion funnel
+  const funnelData = useMemo(()=>{
+    const stages = ["Contacted","Negotiating","Proposal Sent","Closed Won"];
+    return stages.map((s,i)=>({ name:s.replace("Proposal Sent","Proposal").replace("Closed ",""), value:byStatus[s]||0, color:SCOL[s],
+      rate: i>0 && (byStatus[stages[i-1]]||0)>0 ? Math.round(((byStatus[s]||0)/(byStatus[stages[i-1]]||0))*100) : 100 }));
+  },[byStatus]);
+
+  // Team leaderboard
+  const leaderboard = useMemo(()=>{
+    const map={};
+    dashAthletes.forEach(a=>{
+      const owner = a.owner || "Unassigned";
+      if(!map[owner]) map[owner]={name:owner,contacted:0,negotiating:0,won:0,revenue:0};
+      if(a.status==="Contacted") map[owner].contacted++;
+      if(a.status==="Negotiating"||a.status==="Proposal Sent") map[owner].negotiating++;
+      if(a.status==="Closed Won"){ map[owner].won++; map[owner].revenue+=(Number(a.deal_value)||0); }
+    });
+    return Object.values(map).sort((a,b)=>b.won-a.won || b.negotiating-a.negotiating);
+  },[dashAthletes]);
+
   return (
     <div>
       {/* Hero */}
@@ -2284,6 +2385,65 @@ function Dashboard({ athletes, onSelect }) {
             <KpiCard {...kpi}/>
           </div>
         ))}
+      </div>
+
+      {/* Revenue KPIs */}
+      <div style={{ display:"flex", gap:16, marginBottom:24, flexWrap:"wrap" }}>
+        {[
+          { label:"Revenue Won", value:`$${revenue.totalWon.toLocaleString()}`, sub:`${revenue.wonCount} deals closed`, icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>, color:GREEN },
+          { label:"Pipeline Value", value:`$${revenue.totalPipeline.toLocaleString()}`, sub:"active deals", icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>, color:GOLD },
+          { label:"Avg Deal Size", value:revenue.avgDeal?`$${revenue.avgDeal.toLocaleString()}`:"N/A", sub:"per closed deal", icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>, color:PURP },
+          { label:"Win Rate", value:total?`${Math.round(((byStatus["Closed Won"]||0)/Math.max(1,(byStatus["Closed Won"]||0)+(byStatus["Closed Lost"]||0)))*100)}%`:"N/A", sub:"won vs lost", icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>, color:T },
+        ].map((kpi,i)=>(
+          <div key={kpi.label} style={{ flex:1, minWidth:150, animation:`fadeInUp 0.4s ease ${0.3+i*0.08}s both` }}><KpiCard {...kpi}/></div>
+        ))}
+      </div>
+
+      {/* Conversion Funnel + Team Leaderboard */}
+      <div className="mobile-grid-1" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, marginBottom:24 }}>
+        <Card>
+          <div style={{ color:TX1, fontWeight:700, fontSize:15, marginBottom:18 }}>Conversion Funnel</div>
+          {funnelData.map((stage,i)=>{
+            const maxVal = Math.max(...funnelData.map(s=>s.value),1);
+            return (
+              <div key={stage.name} style={{ marginBottom:12 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:5 }}>
+                  <span style={{ color:TX2, fontSize:13 }}>{stage.name}</span>
+                  <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                    <span style={{ color:TX1, fontSize:13, fontWeight:700 }}>{stage.value}</span>
+                    {i>0 && <span style={{ color:stage.rate>=50?GREEN:stage.rate>=25?GOLD:WINE, fontSize:10, fontWeight:700,
+                      background:(stage.rate>=50?GREEN:stage.rate>=25?GOLD:WINE)+"18", padding:"2px 6px", borderRadius:10 }}>{stage.rate}%</span>}
+                  </div>
+                </div>
+                <div style={{ height:8, borderRadius:8, background:C3 }}>
+                  <div style={{ height:"100%", width:`${Math.round((stage.value/maxVal)*100)}%`,
+                    background:`linear-gradient(90deg,${stage.color},${stage.color}88)`, borderRadius:8,
+                    transition:"width 0.8s ease" }}/>
+                </div>
+              </div>
+            );
+          })}
+        </Card>
+        <Card>
+          <div style={{ color:TX1, fontWeight:700, fontSize:15, marginBottom:18 }}>Team Leaderboard</div>
+          {leaderboard.length===0 && <div style={{ color:TX3, fontSize:13, textAlign:"center", padding:20 }}>No data yet</div>}
+          {leaderboard.slice(0,6).map((m,i)=>(
+            <div key={m.name} style={{ display:"flex", alignItems:"center", gap:12, marginBottom:12, padding:"8px 10px",
+              borderRadius:10, background:i===0?T+"10":"transparent", border:i===0?`1px solid ${T}22`:`1px solid transparent` }}>
+              <div style={{ width:26, height:26, borderRadius:8, background:(MEMBER_COLORS[m.name]||T)+"22",
+                color:MEMBER_COLORS[m.name]||T, fontSize:12, fontWeight:800,
+                display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>{i+1}</div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ color:TX1, fontSize:13, fontWeight:600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{m.name}</div>
+                <div style={{ color:TX3, fontSize:10 }}>{m.contacted} contacted · {m.negotiating} active</div>
+              </div>
+              <div style={{ textAlign:"right", flexShrink:0 }}>
+                <div style={{ color:GREEN, fontSize:13, fontWeight:700 }}>{m.won} won</div>
+                {m.revenue>0 && <div style={{ color:TX3, fontSize:10 }}>${m.revenue.toLocaleString()}</div>}
+              </div>
+            </div>
+          ))}
+        </Card>
       </div>
 
       {/* Follow-up recommendations */}
@@ -3010,11 +3170,21 @@ function Pipeline({ athletes, onUpdate, onSelect }) {
                     opacity: dragging?.athlete===a.athlete ? 0.5 : 1 }}
                   onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-2px)"; e.currentTarget.style.boxShadow=`0 6px 20px rgba(0,0,0,0.4),0 0 12px ${color}22`; }}
                   onMouseLeave={e=>{ e.currentTarget.style.transform="none"; e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,0.3)"; }}>
-                  <div style={{ color:TX1, fontSize:13, fontWeight:700, marginBottom:4 }}>{a.athlete}</div>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                    <div style={{ color:TX1, fontSize:13, fontWeight:700, marginBottom:4 }}>{a.athlete}</div>
+                    {(()=>{const days=a.updated_at?Math.round((Date.now()-new Date(a.updated_at).getTime())/(1000*60*60*24)):
+                      (a.created_at?Math.round((Date.now()-new Date(a.created_at).getTime())/(1000*60*60*24)):null);
+                      return days!==null&&days>7&&col!=="Contacted"?(
+                        <div title={`${days} days without update`} style={{ background:GOLD+"22", border:`1px solid ${GOLD}44`,
+                          borderRadius:6, padding:"2px 6px", fontSize:9, fontWeight:700, color:GOLD, whiteSpace:"nowrap" }}>
+                          {days}d stale
+                        </div>):null;})()}
+                  </div>
                   <div style={{ color:TX2, fontSize:11, marginBottom:8 }}>{a.agency}</div>
-                  <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                  <div style={{ display:"flex", gap:6, alignItems:"center", flexWrap:"wrap" }}>
                     <LeaguePill league={a.league}/>
                     {a.deal_value && <Tag label={`$${Number(a.deal_value).toLocaleString()}`} color={GREEN}/>}
+                    {a.owner && <span style={{ fontSize:9, color:MEMBER_COLORS[a.owner]||TX3, fontWeight:700 }}>{a.owner}</span>}
                   </div>
                 </div>
               ))}
@@ -3109,6 +3279,14 @@ function ContactPanel({ contact, onClose, onSave, onDelete }) {
                 color:TX1, fontSize:13, width:"100%", outline:"none", fontFamily:"inherit" }}>
               {TEAM_MEMBERS.map(m=><option key={m}>{m}</option>)}
             </select>
+          </div>
+          <div style={{ marginBottom:14 }}>
+            <label style={{ color:TX3, fontSize:11, fontWeight:600, letterSpacing:"0.06em", textTransform:"uppercase", display:"block", marginBottom:5 }}>NOTES</label>
+            <textarea value={ed.notes||""} onChange={e=>setEd(p=>({...p,notes:e.target.value}))} rows={4}
+              placeholder="Add notes about this contact..."
+              style={{ background:C2, border:`1px solid ${BD}`, borderRadius:8, padding:"9px 12px",
+                color:TX1, fontSize:13, width:"100%", boxSizing:"border-box", outline:"none", fontFamily:"inherit",
+                resize:"vertical", minHeight:80 }}/>
           </div>
         </div>
         <div style={{ padding:"16px 24px", borderTop:`1px solid ${BD}`, display:"flex", gap:10 }}>
@@ -3811,15 +3989,65 @@ export default function App() {
   const [globalQ, setGlobalQ] = useState("");
   const [mobileNav, setMobileNav] = useState(false);
   const [isMobile, setIsMobile] = useState(typeof window !== "undefined" && window.innerWidth <= 768);
-  const [activityLog, setActivityLog] = useState([]);
+  const [activityLog, setActivityLog] = useState(()=>{
+    try { const s=localStorage.getItem("atlaua_activity_log"); return s?JSON.parse(s):[]; } catch{ return []; }
+  });
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [bulkSelected, setBulkSelected] = useState(new Set());
+  const [themeMode, setThemeMode] = useState(_savedTheme);
+  const [reminders, setReminders] = useState(()=>{
+    try { const s=localStorage.getItem("atlaua_reminders"); return s?JSON.parse(s):[]; } catch{ return []; }
+  });
+  const [showReminders, setShowReminders] = useState(false);
+
+  const toggleTheme = useCallback(()=>{
+    const next = themeMode==="dark"?"light":"dark";
+    applyTheme(next); setThemeMode(next); localStorage.setItem("atlaua_theme",next);
+  },[themeMode]);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
+
+  // Persist activity log to localStorage
+  useEffect(()=>{
+    if(activityLog.length>0) localStorage.setItem("atlaua_activity_log",JSON.stringify(activityLog.slice(0,200)));
+  },[activityLog]);
+
+  // Persist reminders to localStorage
+  useEffect(()=>{
+    localStorage.setItem("atlaua_reminders",JSON.stringify(reminders));
+  },[reminders]);
+
+  // Check for due reminders
+  useEffect(()=>{
+    const interval = setInterval(()=>{
+      const now = Date.now();
+      reminders.forEach(r=>{
+        if(!r.done && r.dueAt && r.dueAt<=now && !r.notified){
+          showToast(`Reminder: ${r.text}`, "warning");
+          setReminders(prev=>prev.map(x=>x.id===r.id?{...x,notified:true}:x));
+        }
+      });
+    }, 30000);
+    return ()=>clearInterval(interval);
+  },[reminders]);
+
+  const addReminder = useCallback((text, dueAt=null, athleteRef=null)=>{
+    const r = { id:Date.now()+Math.random(), text, dueAt, athleteRef, done:false, notified:false, created:new Date().toISOString() };
+    setReminders(prev=>[r,...prev]);
+    showToast("Reminder added", "success");
+  },[]);
+
+  const toggleReminder = useCallback((id)=>{
+    setReminders(prev=>prev.map(r=>r.id===id?{...r,done:!r.done}:r));
+  },[]);
+
+  const deleteReminder = useCallback((id)=>{
+    setReminders(prev=>prev.filter(r=>r.id!==id));
+  },[]);
 
   // ─── ACTIVITY LOGGING ────────────────────────────────────────────────────────
   const logActivity = useCallback((action, name, details = "") => {
@@ -4002,10 +4230,10 @@ export default function App() {
 
   const updContact = useCallback(async updated => {
     if (updated.id) {
-      await supabase.from("contacts").update({
-        name: updated.name, company: updated.company, category: updated.category,
-        email: updated.email, phone: updated.phone, owner: updated.owner
-      }).eq("id", updated.id);
+      const contactUpdate = { name: updated.name, company: updated.company, category: updated.category,
+        email: updated.email, phone: updated.phone, owner: updated.owner };
+      if(updated.notes!==undefined) contactUpdate.notes = updated.notes;
+      await supabase.from("contacts").update(contactUpdate).eq("id", updated.id);
     }
     setContacts(prev=>prev.map(c=>c.id===updated.id ? { ...updated, athlete: updated.name } : c));
     logActivity("Updated contact", updated.name);
@@ -4016,8 +4244,8 @@ export default function App() {
     const { data, error } = athlete.id
       ? await supabase.from("athletes").delete().eq("id", athlete.id).select()
       : await supabase.from("athletes").delete().eq("name", athlete.athlete || athlete.name).select();
-    if (error) { alert(`Delete failed: ${error.message}`); setDeleteConfirm(null); return; }
-    if (!data || data.length === 0) { alert("Could not delete — check Supabase RLS policies. Run supabase-security.sql in your SQL Editor."); setDeleteConfirm(null); return; }
+    if (error) { showToast(`Delete failed: ${error.message}`,"error"); setDeleteConfirm(null); return; }
+    if (!data || data.length === 0) { showToast("Could not delete — check Supabase RLS policies.","error"); setDeleteConfirm(null); return; }
     setAthletes(prev => prev.filter(a => a.athlete !== athlete.athlete));
     logActivity("Deleted athlete", athlete.athlete);
     setDeleteConfirm(null);
@@ -4028,19 +4256,19 @@ export default function App() {
     // Use .select() so we can verify rows were actually deleted (RLS can silently block)
     if (contact.id) {
       const { data, error } = await supabase.from("contacts").delete().eq("id", contact.id).select();
-      if (error) { alert(`Delete failed: ${error.message}`); setDeleteConfirm(null); return; }
+      if (error) { showToast(`Delete failed: ${error.message}`,"error"); setDeleteConfirm(null); return; }
       if (!data || data.length === 0) {
         // RLS blocked or id mismatch — try by email
         if (contact.email) {
           const { data: d2, error: e2 } = await supabase.from("contacts").delete().eq("email", contact.email).select();
-          if (e2) { alert(`Delete failed: ${e2.message}`); setDeleteConfirm(null); return; }
-          if (!d2 || d2.length === 0) { alert("Could not delete — check Supabase RLS policies. Run the supabase-security.sql file in your SQL Editor."); setDeleteConfirm(null); return; }
-        } else { alert("Could not delete — check Supabase RLS policies."); setDeleteConfirm(null); return; }
+          if (e2) { showToast(`Delete failed: ${e2.message}`,"error"); setDeleteConfirm(null); return; }
+          if (!d2 || d2.length === 0) { showToast("Could not delete — check Supabase RLS policies.","error"); setDeleteConfirm(null); return; }
+        } else { showToast("Could not delete — check RLS policies.","error"); setDeleteConfirm(null); return; }
       }
     } else if (contact.email) {
       const { data, error } = await supabase.from("contacts").delete().eq("email", contact.email).select();
-      if (error) { alert(`Delete failed: ${error.message}`); setDeleteConfirm(null); return; }
-      if (!data || data.length === 0) { alert("Could not delete — check Supabase RLS policies."); setDeleteConfirm(null); return; }
+      if (error) { showToast(`Delete failed: ${error.message}`,"error"); setDeleteConfirm(null); return; }
+      if (!data || data.length === 0) { showToast("Could not delete — check RLS policies.","error"); setDeleteConfirm(null); return; }
     }
     setContacts(prev => prev.filter(c => c.id !== contact.id && c.email !== contact.email));
     logActivity("Deleted contact", contact.name);
@@ -4090,7 +4318,7 @@ export default function App() {
       setContacts(prev => prev.filter(c => (c.owner || currentUser) !== member));
       logActivity("Cleared contacts", `${toDelete.length} contacts for ${member}`);
     } catch (err) {
-      alert(`Error clearing contacts: ${err.message}`);
+      showToast(`Error clearing contacts: ${err.message}`,"error");
     }
   }, [contacts, logActivity]);
 
@@ -4363,12 +4591,29 @@ export default function App() {
               page==="Pipeline" ? `${athletes.filter(a=>a.status==="Negotiating"||a.status==="Proposal Sent").length} active deals` : ""
             }</div>}
           </div>
-          {!isMobile && (
-            <div style={{ flex:1, maxWidth:400, marginLeft:24 }}>
-              <SearchInput value={globalQ} onChange={setGlobalQ} placeholder="Search athletes, contacts, agencies..."/>
+          <div style={{ flex:1, maxWidth:isMobile?180:400, marginLeft:isMobile?4:24 }}>
+            <SearchInput value={globalQ} onChange={setGlobalQ} placeholder={isMobile?"Search...":"Search athletes, contacts, agencies..."}/>
+          </div>
+          <div style={{ marginLeft:"auto", display:"flex", gap:isMobile?6:12, alignItems:"center" }}>
+            {/* Reminders button */}
+            <div onClick={()=>setShowReminders(true)} title="Reminders & Tasks"
+              style={{ width:34, height:34, borderRadius:10, background:C2, border:`1px solid ${BD}`,
+                display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer",
+                color:reminders.filter(r=>!r.done).length>0?GOLD:TX3, fontSize:15, position:"relative" }}>
+              {"\u{1F514}"}
+              {reminders.filter(r=>!r.done).length>0 && (
+                <div style={{ position:"absolute", top:-3, right:-3, width:16, height:16, borderRadius:"50%",
+                  background:WINE, color:"#fff", fontSize:9, fontWeight:800,
+                  display:"flex", alignItems:"center", justifyContent:"center" }}>{reminders.filter(r=>!r.done).length}</div>
+              )}
             </div>
-          )}
-          <div style={{ marginLeft:"auto", display:"flex", gap:isMobile?8:12, alignItems:"center" }}>
+            {/* Theme toggle */}
+            <div onClick={toggleTheme} title={`Switch to ${themeMode==="dark"?"light":"dark"} mode`}
+              style={{ width:34, height:34, borderRadius:10, background:C2, border:`1px solid ${BD}`,
+                display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer",
+                color:themeMode==="dark"?GOLD:PURP, fontSize:16, transition:"all 0.2s" }}>
+              {themeMode==="dark" ? "\u2600\uFE0F" : "\u{1F319}"}
+            </div>
             {/* Auto-tracker status indicator */}
             {(() => {
               const hasToken = !!localStorage.getItem(AUTO_TRACK_TOKEN_PREFIX + currentEmail);
@@ -4443,6 +4688,57 @@ export default function App() {
                 if(deleteConfirm.type==="athlete") deleteAthlete(deleteConfirm.item);
                 else deleteContact(deleteConfirm.item);
               }} style={{flex:1,justifyContent:"center"}}>Delete</Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notifications */}
+      <ToastContainer />
+
+      {/* Reminders Panel */}
+      {showReminders && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)", zIndex:1050 }}
+          onClick={()=>setShowReminders(false)}>
+          <div onClick={e=>e.stopPropagation()} style={{ position:"fixed", right:0, top:0, bottom:0, width:"min(400px,90vw)",
+            background:SB, borderLeft:`1px solid ${BD2}`, boxShadow:"-8px 0 40px rgba(0,0,0,0.5)",
+            display:"flex", flexDirection:"column", zIndex:1051 }}>
+            <div style={{ padding:"20px 24px", borderBottom:`1px solid ${BD}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <h2 style={{ margin:0, color:TX1, fontSize:18, fontWeight:700 }}>Reminders & Tasks</h2>
+              <button onClick={()=>setShowReminders(false)} style={{ background:C2, border:`1px solid ${BD}`, color:TX2, borderRadius:8, width:34, height:34, cursor:"pointer", fontSize:16 }}>x</button>
+            </div>
+            <div style={{ padding:"16px 24px", borderBottom:`1px solid ${BD}` }}>
+              <form onSubmit={e=>{e.preventDefault();const fd=new FormData(e.target);const text=fd.get("rtext");const due=fd.get("rdue");
+                if(text){addReminder(text,due?new Date(due).getTime():null);e.target.reset();}}}>
+                <input name="rtext" placeholder="What needs to be done?" style={{ width:"100%", boxSizing:"border-box", background:C2, border:`1px solid ${BD}`, borderRadius:8, padding:"9px 12px",
+                  color:TX1, fontSize:13, outline:"none", fontFamily:"inherit", marginBottom:8 }}/>
+                <div style={{ display:"flex", gap:8 }}>
+                  <input name="rdue" type="datetime-local" style={{ flex:1, background:C2, border:`1px solid ${BD}`, borderRadius:8, padding:"7px 10px",
+                    color:TX2, fontSize:12, outline:"none", fontFamily:"inherit" }}/>
+                  <Btn size="sm" style={{ flexShrink:0 }}>Add</Btn>
+                </div>
+              </form>
+            </div>
+            <div style={{ flex:1, overflowY:"auto", padding:"12px 24px" }}>
+              {reminders.length===0 && <div style={{ color:TX3, fontSize:13, textAlign:"center", padding:30 }}>No reminders yet</div>}
+              {reminders.map(r=>(
+                <div key={r.id} style={{ display:"flex", gap:10, alignItems:"flex-start", padding:"10px 0",
+                  borderBottom:`1px solid ${BD}`, opacity:r.done?0.5:1 }}>
+                  <div onClick={()=>toggleReminder(r.id)} style={{ width:20, height:20, borderRadius:6, flexShrink:0, marginTop:2, cursor:"pointer",
+                    border:`2px solid ${r.done?GREEN:TX3}`, background:r.done?GREEN:"transparent",
+                    display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    {r.done && <span style={{ color:"#fff", fontSize:11, fontWeight:800 }}>{"\u2713"}</span>}
+                  </div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ color:TX1, fontSize:13, textDecoration:r.done?"line-through":"none" }}>{r.text}</div>
+                    {r.dueAt && <div style={{ color:r.dueAt<Date.now()&&!r.done?WINE:TX3, fontSize:10, marginTop:2 }}>
+                      Due: {new Date(r.dueAt).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}
+                      {r.dueAt<Date.now()&&!r.done && " (overdue)"}
+                    </div>}
+                  </div>
+                  <button onClick={()=>deleteReminder(r.id)} style={{ background:"none", border:"none", color:TX3, cursor:"pointer", fontSize:14 }}>{"\u2715"}</button>
+                </div>
+              ))}
             </div>
           </div>
         </div>
