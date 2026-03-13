@@ -714,7 +714,7 @@ let TX3   = "rgba(255,248,232,0.28)";
 let SH_SM = "0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2)";
 let SH_MD = "0 4px 16px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.2)";
 let SH_LG = "0 12px 40px rgba(0,0,0,0.45), 0 4px 12px rgba(0,0,0,0.3)";
-const SH_GLOW = (c) => `0 0 24px ${c}18, 0 8px 32px rgba(0,0,0,0.4)`;
+const SH_GLOW = (c) => `0 0 24px ${c}18, ${SH_LG}`;
 // Radius scale
 const R_SM = 8, R_MD = 12, R_LG = 16, R_XL = 20, R_PILL = 100;
 
@@ -740,7 +740,7 @@ function ToastContainer() {
   if(!toasts.length) return null;
   return (<div style={{position:"fixed",top:20,right:20,zIndex:9999,display:"flex",flexDirection:"column",gap:10,maxWidth:380}}>
     {toasts.map(t=>{const c=colors[t.type]||T;return(
-      <div key={t.id} style={{background:C1,border:`1px solid ${c}55`,borderRadius:12,padding:"12px 16px",boxShadow:`0 8px 32px rgba(0,0,0,0.4), 0 0 12px ${c}22`,display:"flex",alignItems:"center",gap:10,animation:"fadeInUp 0.3s ease",backdropFilter:"blur(12px)"}}>
+      <div key={t.id} style={{background:C1,border:`1px solid ${c}55`,borderRadius:12,padding:"12px 16px",boxShadow:`${SH_LG}, 0 0 12px ${c}22`,display:"flex",alignItems:"center",gap:10,animation:"fadeInUp 0.3s ease",backdropFilter:"blur(12px)"}}>
         <div style={{width:28,height:28,borderRadius:8,background:c+"22",border:`1px solid ${c}44`,display:"flex",alignItems:"center",justifyContent:"center",color:c,fontSize:14,fontWeight:700,flexShrink:0}}>{icons[t.type]}</div>
         <div style={{flex:1,color:TX1,fontSize:13,fontWeight:500,lineHeight:1.4}}>{t.msg}</div>
         <button onClick={()=>setToasts(p=>p.filter(x=>x.id!==t.id))} style={{background:"none",border:"none",color:TX3,cursor:"pointer",fontSize:16,padding:2,flexShrink:0}}>{"\u2715"}</button>
@@ -1113,7 +1113,7 @@ function Btn({ children, onClick, variant="primary", size="md", icon, style:extr
     ghost:    { background:"transparent", color:TX2, border:`1px solid ${BD}` },
     outline:  { background:"transparent", color:T, border:`1px solid ${T}55` },
     success:  { background:`linear-gradient(135deg,${GREEN},${GREEN}CC)`, color:"#0A0613", boxShadow:`0 4px 18px ${GREEN}44` },
-    google:   { background:"#fff", color:"#1a1a1a", boxShadow:"0 2px 12px rgba(0,0,0,0.35)" }
+    google:   { background:C1, color:TX1, boxShadow:SH_SM, border:`1px solid ${BD}` }
   };
   const [hov, setHov] = useState(false);
   return (
@@ -1152,7 +1152,7 @@ function KpiCard({ label, value, sub, color=T, icon }) {
     <div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
       style={{ flex:1, minWidth:160, background:C1, borderRadius:R_LG, padding:"22px 24px",
         border:`1px solid ${hov ? color+"44" : BD}`,
-        boxShadow: hov ? `0 8px 30px rgba(0,0,0,0.4), 0 0 20px ${color}12` : SH_MD,
+        boxShadow: hov ? `${SH_LG}, 0 0 20px ${color}12` : SH_MD,
         transition:"all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         transform: hov ? "translateY(-3px)" : "none",
         position:"relative", overflow:"hidden" }}>
@@ -1328,10 +1328,10 @@ function ImportCSVModal({ onClose, onImport, mode = "athletes" }) {
     setDone(rows.length); setImporting(false);
   };
 
-  const overlay = { position:"fixed", inset:0, background:"rgba(0,0,0,0.72)", backdropFilter:"blur(8px)",
+  const overlay = { position:"fixed", inset:0, background:`${BG}DD`, backdropFilter:"blur(8px)",
     display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000 };
   const box = { background:C1, border:`1px solid ${BD2}`, borderRadius:16, padding:32,
-    width:"min(560px,92vw)", boxShadow:`0 24px 64px rgba(0,0,0,0.6), 0 0 40px ${T}18` };
+    width:"min(560px,92vw)", boxShadow:`${SH_LG}, 0 0 40px ${T}18` };
 
   return (
     <div style={overlay} onClick={e=>{ if(e.target===e.currentTarget) onClose(); }}>
@@ -1721,7 +1721,7 @@ function GmailConnectModal({ onClose, onImport, defaultOwner="Carlos", onTokenCa
     (c.name.toLowerCase().includes(query.toLowerCase()) || c.email.toLowerCase().includes(query.toLowerCase()))
   );
 
-  const overlay = { position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", backdropFilter:"blur(10px)",
+  const overlay = { position:"fixed", inset:0, background:`${BG}EE`, backdropFilter:"blur(10px)",
     display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000 };
   const box = { background:C1, border:`1px solid ${BD2}`, borderRadius:18, padding:32,
     width:"min(680px,96vw)", maxHeight:"90vh", display:"flex", flexDirection:"column",
@@ -1752,7 +1752,7 @@ function GmailConnectModal({ onClose, onImport, defaultOwner="Carlos", onTokenCa
 
         {error && (
           <div style={{ background:WINE+"22", border:`1px solid ${WINE}44`, borderRadius:8,
-            padding:"10px 14px", color:"#ff9999", fontSize:13, marginBottom:16 }}>{error}</div>
+            padding:"10px 14px", color:ROSE, fontSize:13, marginBottom:16 }}>{error}</div>
         )}
 
         {/* Step 0: Info */}
@@ -1884,7 +1884,7 @@ function GmailConnectModal({ onClose, onImport, defaultOwner="Carlos", onTokenCa
                 <div style={{ width:52, height:52, borderRadius:"50%", background:GREEN+"22", border:`2px solid ${GREEN}44`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px" }}><svg width="28" height="28" fill="none" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4" stroke={GREEN} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg></div>
                 <div style={{ color:TX1, fontSize:20, fontWeight:700, marginBottom:8 }}>Contacts imported!</div>
                 <div style={{ color:TX2, fontSize:14 }}>Your Gmail contacts are now in the CRM</div>
-                {error && <div style={{ color:"#ff9999", fontSize:13, marginTop:8 }}>{error}</div>}
+                {error && <div style={{ color:ROSE, fontSize:13, marginTop:8 }}>{error}</div>}
                 <div style={{ marginTop:24 }}>
                   <Btn onClick={onClose}>Back to Contacts</Btn>
                 </div>
@@ -1939,9 +1939,9 @@ function Panel({ a, onClose, onSave, onDelete, logActivity }) {
     </div>
   );
 
-  const overlay = { position:"fixed", inset:0, background:"rgba(0,0,0,0.7)", backdropFilter:"blur(6px)", zIndex:900 };
+  const overlay = { position:"fixed", inset:0, background:`${BG}CC`, backdropFilter:"blur(6px)", zIndex:900 };
   const drawer = { position:"fixed", right:0, top:0, bottom:0, width:"min(520px,95vw)",
-    background:SB, borderLeft:`1px solid ${BD2}`, boxShadow:`-12px 0 48px rgba(0,0,0,0.5)`,
+    background:SB, borderLeft:`1px solid ${BD2}`, boxShadow:`-12px 0 48px ${BG}88`,
     display:"flex", flexDirection:"column", zIndex:901 };
 
   return (
@@ -2136,10 +2136,10 @@ function AddModal({ onClose, onAdd }) {
     </div>
   );
 
-  const overlay = { position:"fixed", inset:0, background:"rgba(0,0,0,0.75)", backdropFilter:"blur(8px)",
+  const overlay = { position:"fixed", inset:0, background:`${BG}DD`, backdropFilter:"blur(8px)",
     display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000 };
   const box = { background:C1, border:`1px solid ${BD2}`, borderRadius:16, padding:32,
-    width:"min(480px,92vw)", boxShadow:`0 24px 64px rgba(0,0,0,0.6)` };
+    width:"min(480px,92vw)", boxShadow:SH_LG };
 
   return (
     <div style={overlay} onClick={e=>{ if(e.target===e.currentTarget) onClose(); }}>
@@ -2691,7 +2691,7 @@ function EmailHistoryScanner({ athletes, onStatusUpdate, onClose }) {
 
   return (
     <div style={{ position:"fixed", inset:0, zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center",
-      background:"rgba(0,0,0,0.7)", backdropFilter:"blur(8px)" }} onClick={e => e.target === e.currentTarget && !scanning && onClose()}>
+      background:`${BG}CC`, backdropFilter:"blur(8px)" }} onClick={e => e.target === e.currentTarget && !scanning && onClose()}>
       <div style={{ background:C1, border:`1px solid ${BD}`, borderRadius:16, padding:28, width:"100%", maxWidth:600,
         maxHeight:"85vh", overflow:"auto" }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
@@ -3166,10 +3166,10 @@ function Pipeline({ athletes, onUpdate, onSelect }) {
                   }}
                   style={{ background:C2, border:`1px solid ${BD}`, borderRadius:10,
                     padding:"12px 14px", marginBottom:10, cursor:"grab",
-                    boxShadow:"0 2px 8px rgba(0,0,0,0.3)", transition:"transform 0.15s, box-shadow 0.15s",
+                    boxShadow:SH_SM, transition:"transform 0.15s, box-shadow 0.15s",
                     opacity: dragging?.athlete===a.athlete ? 0.5 : 1 }}
-                  onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-2px)"; e.currentTarget.style.boxShadow=`0 6px 20px rgba(0,0,0,0.4),0 0 12px ${color}22`; }}
-                  onMouseLeave={e=>{ e.currentTarget.style.transform="none"; e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,0.3)"; }}>
+                  onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-2px)"; e.currentTarget.style.boxShadow=SH_MD+`,0 0 12px ${color}22`; }}
+                  onMouseLeave={e=>{ e.currentTarget.style.transform="none"; e.currentTarget.style.boxShadow=SH_SM; }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
                     <div style={{ color:TX1, fontSize:13, fontWeight:700, marginBottom:4 }}>{a.athlete}</div>
                     {(()=>{const days=a.updated_at?Math.round((Date.now()-new Date(a.updated_at).getTime())/(1000*60*60*24)):
@@ -3195,12 +3195,12 @@ function Pipeline({ athletes, onUpdate, onSelect }) {
 
       {/* Mobile Status Picker */}
       {mobileStatusPicker && (
-        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.7)", backdropFilter:"blur(6px)",
+        <div style={{ position:"fixed", inset:0, background:`${BG}CC`, backdropFilter:"blur(6px)",
           display:"flex", alignItems:"flex-end", justifyContent:"center", zIndex:1000 }}
           onClick={()=>setMobileStatusPicker(null)}>
           <div onClick={e=>e.stopPropagation()} style={{ background:C1, borderRadius:"20px 20px 0 0",
             padding:"24px 20px", width:"100%", maxWidth:420, border:`1px solid ${BD2}`,
-            boxShadow:`0 -12px 48px rgba(0,0,0,0.5)` }}>
+            boxShadow:SH_LG }}>
             <div style={{ width:40, height:4, borderRadius:4, background:TX3, margin:"0 auto 16px" }}/>
             <div style={{ color:TX1, fontSize:16, fontWeight:700, marginBottom:4 }}>{mobileStatusPicker.athlete}</div>
             <div style={{ color:TX2, fontSize:12, marginBottom:16 }}>Move to stage:</div>
@@ -3258,9 +3258,9 @@ function ContactPanel({ contact, onClose, onSave, onDelete }) {
 
   return (
     <>
-      <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.7)", backdropFilter:"blur(6px)", zIndex:900 }} onClick={onClose}/>
+      <div style={{ position:"fixed", inset:0, background:`${BG}CC`, backdropFilter:"blur(6px)", zIndex:900 }} onClick={onClose}/>
       <div style={{ position:"fixed", right:0, top:0, bottom:0, width:"min(480px,95vw)",
-        background:SB, borderLeft:`1px solid ${BD2}`, boxShadow:"-12px 0 48px rgba(0,0,0,0.5)",
+        background:SB, borderLeft:`1px solid ${BD2}`, boxShadow:`-12px 0 48px ${BG}88`,
         display:"flex", flexDirection:"column", zIndex:901 }}>
         <div style={{ padding:"20px 24px", borderBottom:`1px solid ${BD}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <h2 style={{ margin:0, color:TX1, fontSize:18, fontWeight:700 }}>Edit Contact</h2>
@@ -3395,8 +3395,8 @@ function Contacts({ contacts, onImport, onUpdateContact, onDeleteContact, onClea
         {filterOwner !== "All" && ownerCounts[filterOwner] > 0 && (
           <button onClick={()=>onClearMember(filterOwner)}
             style={{ padding:"7px 14px", borderRadius:10, cursor:"pointer", fontWeight:600, fontSize:12,
-              fontFamily:"inherit", transition:"all 0.18s", border:`1px solid #ff4d4d44`,
-              background:"#ff4d4d18", color:"#ff4d4d", marginLeft:4 }}>
+              fontFamily:"inherit", transition:"all 0.18s", border:`1px solid ${WINE}44`,
+              background:`${WINE}18`, color:WINE, marginLeft:4 }}>
             Clear {filterOwner}'s List
           </button>
         )}
@@ -3825,7 +3825,7 @@ function LoginScreen({ onAuth }) {
           <div style={{ color:T, fontSize:10, letterSpacing:"0.2em", fontWeight:600, opacity:0.7 }}>SPORTS CRM</div>
         </div>
         <div style={{ background:C1, border:`1px solid ${BD2}`, borderRadius:20, padding:"36px 32px",
-          boxShadow:`0 24px 64px rgba(0,0,0,0.5), 0 0 40px ${T}08` }}>
+          boxShadow:`${SH_LG}, 0 0 40px ${T}08` }}>
 
           {!selectedEmail ? (<>
             <h2 style={{ margin:"0 0 6px", color:TX1, fontSize:20, fontWeight:800, textAlign:"center" }}>
@@ -3937,7 +3937,7 @@ function LoginScreen({ onAuth }) {
 
           {error && (
             <div style={{ background:WINE+"22", border:`1px solid ${WINE}44`, borderRadius:10,
-              padding:"10px 14px", marginTop:18, color:"#ff6b8a", fontSize:13, fontWeight:500 }}>
+              padding:"10px 14px", marginTop:18, color:ROSE, fontSize:13, fontWeight:500 }}>
               {error}
             </div>
           )}
@@ -4421,9 +4421,9 @@ export default function App() {
       {/* ── SIDEBAR (desktop) ── */}
       {!isMobile && (
         <aside style={{
-          width:SB_W, background:`linear-gradient(180deg, ${SB} 0%, #040404 100%)`, display:"flex", flexDirection:"column",
+          width:SB_W, background:`linear-gradient(180deg, ${SB} 0%, ${C1} 100%)`, display:"flex", flexDirection:"column",
           borderRight:`1px solid ${BD}`, flexShrink:0, transition:"width 0.28s cubic-bezier(0.4,0,0.2,1)",
-          boxShadow:"4px 0 32px rgba(0,0,0,0.5)", position:"relative", zIndex:10, overflow:"hidden"
+          boxShadow:SH_MD, position:"relative", zIndex:10, overflow:"hidden"
         }}>
           {/* Logo */}
           <div style={{ padding:`24px ${sbCollapsed?14:22}px 20px`, borderBottom:`1px solid ${BD}`,
@@ -4516,10 +4516,10 @@ export default function App() {
       {/* ── MOBILE NAV OVERLAY ── */}
       {isMobile && mobileNav && (
         <>
-          <div onClick={()=>setMobileNav(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)", zIndex:998 }}/>
+          <div onClick={()=>setMobileNav(false)} style={{ position:"fixed", inset:0, background:`${BG}CC`, backdropFilter:"blur(4px)", zIndex:998 }}/>
           <div style={{ position:"fixed", left:0, top:0, bottom:0, width:260, background:SB,
             borderRight:`1px solid ${BD}`, zIndex:999, display:"flex", flexDirection:"column",
-            boxShadow:"4px 0 32px rgba(0,0,0,0.6)" }}>
+            boxShadow:SH_LG }}>
             <div style={{ padding:"20px 18px", borderBottom:`1px solid ${BD}`, display:"flex", alignItems:"center", gap:12 }}>
               <AtlauaJaguarLogo size={36}/>
               <div>
@@ -4665,11 +4665,11 @@ export default function App() {
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
-        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.75)", backdropFilter:"blur(8px)",
+        <div style={{ position:"fixed", inset:0, background:`${BG}DD`, backdropFilter:"blur(8px)",
           display:"flex", alignItems:"center", justifyContent:"center", zIndex:1100 }}
           onClick={e=>{ if(e.target===e.currentTarget) setDeleteConfirm(null); }}>
           <div style={{ background:C1, border:`1px solid ${WINE}44`, borderRadius:16, padding:32,
-            width:"min(420px,90vw)", boxShadow:`0 24px 64px rgba(0,0,0,0.6), 0 0 40px ${WINE}18`, textAlign:"center" }}>
+            width:"min(420px,90vw)", boxShadow:`${SH_LG}, 0 0 40px ${WINE}18`, textAlign:"center" }}>
             <div style={{ width:52, height:52, borderRadius:"50%", background:WINE+"22", border:`2px solid ${WINE}44`,
               display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px" }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={WINE} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -4698,10 +4698,10 @@ export default function App() {
 
       {/* Reminders Panel */}
       {showReminders && (
-        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)", zIndex:1050 }}
+        <div style={{ position:"fixed", inset:0, background:`${BG}BB`, backdropFilter:"blur(4px)", zIndex:1050 }}
           onClick={()=>setShowReminders(false)}>
           <div onClick={e=>e.stopPropagation()} style={{ position:"fixed", right:0, top:0, bottom:0, width:"min(400px,90vw)",
-            background:SB, borderLeft:`1px solid ${BD2}`, boxShadow:"-8px 0 40px rgba(0,0,0,0.5)",
+            background:SB, borderLeft:`1px solid ${BD2}`, boxShadow:`-8px 0 40px ${BG}88`,
             display:"flex", flexDirection:"column", zIndex:1051 }}>
             <div style={{ padding:"20px 24px", borderBottom:`1px solid ${BD}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
               <h2 style={{ margin:0, color:TX1, fontSize:18, fontWeight:700 }}>Reminders & Tasks</h2>
