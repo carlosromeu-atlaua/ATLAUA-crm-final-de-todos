@@ -678,14 +678,14 @@ const TODAY   = new Date().toISOString().split("T")[0];
 const LEAGUES = ["NFL","NBA","NHL","MLB","UFC"];
 const STATUSES= ["Contacted","Negotiating","Proposal Sent","Closed Won","Closed Lost","Pending"];
 const ICONS   = {NFL:"",NBA:"",NHL:"",MLB:"",UFC:""};
-const TEAM_MEMBERS = ["Carlos","Maya","Adrian","Info Atlaua","Stephen","Felix"];
+const TEAM_MEMBERS = ["Carlos","Maya","Adrian","Felix","Stephen","Correo General"];
 const TEAM_EMAIL_MAP = {
   "carlosromeu@atlaua.de":"Carlos",
   "mayakoar@atlaua.de":"Maya",
   "adriangoransch@atlaua.de":"Adrian",
-  "info@atlaua.de":"Info Atlaua",
-  "stephenwalden@atlaualabs.com":"Stephen",
-  "felix@atlaua.de":"Felix"
+  "felixgoransch@atlaua.de":"Felix",
+  "stephengoransch@atlaua.de":"Stephen",
+  "info@atlaua.de":"Correo General"
 };
 const ALLOWED_EMAILS = Object.keys(TEAM_EMAIL_MAP);
 
@@ -750,7 +750,7 @@ function ToastContainer() {
 const SCOL  = { Contacted:T, Negotiating:GOLD, "Proposal Sent":PURP, "Closed Won":GREEN, "Closed Lost":"#444", Pending:TX3 };
 const PCOLS = [T, WINE, GOLD, PURP, ROSE, GREEN];
 const LCOLS = { NFL:WINE, NBA:T, NHL:PURP, MLB:GREEN, UFC:GOLD };
-const MEMBER_COLORS = { Carlos:T, Maya:ROSE, Adrian:PURP, "Info Atlaua":GOLD, Stephen:GREEN, Felix:"#FF6B35" };
+const MEMBER_COLORS = { Carlos:T, Maya:ROSE, Adrian:PURP, Felix:GREEN, Stephen:WINE, "Correo General":GOLD };
 
 // ─── GOOGLE OAUTH ─────────────────────────────────────────────────────────────
 // IMPORTANT: Replace with your own Google OAuth client ID from console.cloud.google.com
@@ -2353,7 +2353,7 @@ function Dashboard({ athletes, onSelect }) {
         <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
           <div style={{ width:6, height:6, borderRadius:"50%", background:GREEN, boxShadow:`0 0 8px ${GREEN}66` }}/>
           <div style={{ color:GREEN, fontSize:11, fontWeight:700, letterSpacing:"0.1em" }}>LIVE</div>
-          <div style={{ color:TX3, fontSize:11, letterSpacing:"0.06em" }}>ATLAUA SPORTS CRM</div>
+          <div style={{ color:TX3, fontSize:11, letterSpacing:"0.06em" }}>ATLAUA CRM</div>
         </div>
         <h1 style={{ margin:0, color:TX1, fontSize:34, fontWeight:800, letterSpacing:"-0.025em", lineHeight:1.1 }} className="mobile-text-sm">
           Hello Team ATLAUA
@@ -3808,55 +3808,55 @@ function LoginScreen({ onAuth }) {
   };
 
   return (
-    <div style={{ minHeight:"100vh", background:BG, display:"flex", alignItems:"center", justifyContent:"center",
-      fontFamily:"'Inter','Codec Pro',system-ui,-apple-system,sans-serif" }}>
+    <div style={{ position:"fixed", inset:0, background:BG, display:"flex", alignItems:"flex-start", justifyContent:"center",
+      fontFamily:"'Inter','Codec Pro',system-ui,-apple-system,sans-serif", overflowY:"auto" }}>
       <div style={{ position:"fixed", inset:0, overflow:"hidden", pointerEvents:"none" }}>
         <div style={{ position:"absolute", width:500, height:500, borderRadius:"50%",
           background:`radial-gradient(circle, ${T}12, transparent 70%)`, top:"-10%", right:"-5%" }}/>
         <div style={{ position:"absolute", width:400, height:400, borderRadius:"50%",
           background:`radial-gradient(circle, ${WINE}10, transparent 70%)`, bottom:"-8%", left:"-5%" }}/>
       </div>
-      <div style={{ position:"relative", zIndex:1, width:"min(420px, 90vw)" }}>
-        <div style={{ textAlign:"center", marginBottom:36 }}>
+      <div style={{ position:"relative", zIndex:1, width:"min(420px, 90vw)", padding:"40px 0" }}>
+        <div style={{ textAlign:"center", marginBottom:24 }}>
           <div style={{ filter:"drop-shadow(0 4px 24px rgba(4,189,183,0.3))", display:"inline-block" }}>
-            <AtlauaJaguarLogo size={72}/>
+            <AtlauaJaguarLogo size={56}/>
           </div>
-          <div style={{ color:TX1, fontSize:22, fontWeight:800, letterSpacing:"0.04em", marginTop:16 }}>ATLAUA</div>
-          <div style={{ color:T, fontSize:10, letterSpacing:"0.2em", fontWeight:600, opacity:0.7 }}>SPORTS CRM</div>
+          <div style={{ color:TX1, fontSize:20, fontWeight:800, letterSpacing:"0.04em", marginTop:12 }}>ATLAUA</div>
+          <div style={{ color:T, fontSize:10, letterSpacing:"0.2em", fontWeight:600, opacity:0.7 }}>ATLAUA CRM</div>
         </div>
-        <div style={{ background:C1, border:`1px solid ${BD2}`, borderRadius:20, padding:"36px 32px",
+        <div style={{ background:C1, border:`1px solid ${BD2}`, borderRadius:20, padding:"24px 28px",
           boxShadow:`${SH_LG}, 0 0 40px ${T}08` }}>
 
           {!selectedEmail ? (<>
             <h2 style={{ margin:"0 0 6px", color:TX1, fontSize:20, fontWeight:800, textAlign:"center" }}>
               Welcome back
             </h2>
-            <p style={{ margin:"0 0 28px", color:TX2, fontSize:13, textAlign:"center" }}>
+            <p style={{ margin:"0 0 18px", color:TX2, fontSize:13, textAlign:"center" }}>
               Select your profile to continue
             </p>
-            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
               {ALLOWED_EMAILS.map(em => {
                 const name = TEAM_EMAIL_MAP[em] || em;
                 const mc = MEMBER_COLORS[name] || T;
                 return (
                   <button key={em} onClick={() => handleSelectMember(em)}
                     style={{
-                      display:"flex", alignItems:"center", gap:16, padding:"16px 20px",
+                      display:"flex", alignItems:"center", gap:14, padding:"12px 16px",
                       background: C2, border: `1.5px solid ${BD}`,
                       borderRadius:14, cursor:"pointer", transition:"all 0.2s", fontFamily:"inherit",
                     }}
                     onMouseEnter={e => { e.currentTarget.style.background = mc + "18"; e.currentTarget.style.borderColor = mc + "66"; e.currentTarget.style.transform = "translateY(-1px)"; }}
                     onMouseLeave={e => { e.currentTarget.style.background = C2; e.currentTarget.style.borderColor = BD; e.currentTarget.style.transform = "none"; }}>
                     <div style={{
-                      width:44, height:44, borderRadius:"50%",
+                      width:38, height:38, borderRadius:"50%",
                       background:`linear-gradient(135deg, ${mc}33, ${mc}11)`,
                       border:`2px solid ${mc}55`,
                       display:"flex", alignItems:"center", justifyContent:"center",
-                      color:mc, fontSize:18, fontWeight:800, flexShrink:0
+                      color:mc, fontSize:16, fontWeight:800, flexShrink:0
                     }}>{name[0]}</div>
                     <div style={{ flex:1, textAlign:"left" }}>
-                      <div style={{ color:TX1, fontSize:16, fontWeight:700 }}>{name}</div>
-                      <div style={{ color:TX2, fontSize:12 }}>{em}</div>
+                      <div style={{ color:TX1, fontSize:14, fontWeight:700 }}>{name}</div>
+                      <div style={{ color:TX2, fontSize:11 }}>{em}</div>
                     </div>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={TX3}
                       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -4408,7 +4408,7 @@ export default function App() {
         <AtlauaJaguarLogo size={80}/>
       </div>
       <div style={{ color:TX1, fontSize:18, marginTop:24, letterSpacing:"0.08em", fontWeight:700 }}>ATLAUA</div>
-      <div style={{ color:TX3, fontSize:11, marginTop:6, letterSpacing:"0.15em" }}>LOADING CRM...</div>
+      <div style={{ color:TX3, fontSize:11, marginTop:6, letterSpacing:"0.15em" }}>LOADING ATLAUA CRM...</div>
       <div style={{ width:120, height:3, borderRadius:3, background:C3, marginTop:20, overflow:"hidden" }}>
         <div style={{ height:"100%", width:"60%", borderRadius:3, background:`linear-gradient(90deg, transparent, ${T}, transparent)`,
           animation:"shimmer 1.5s ease infinite" }}/>
@@ -4434,7 +4434,7 @@ export default function App() {
             {!sbCollapsed && (
               <div style={{ overflow:"hidden" }}>
                 <div style={{ color:TX1, fontSize:18, fontWeight:800, letterSpacing:"0.04em", whiteSpace:"nowrap" }}>ATLAUA</div>
-                <div style={{ color:T, fontSize:9, letterSpacing:"0.2em", whiteSpace:"nowrap", fontWeight:600, opacity:0.7 }}>SPORTS CRM</div>
+                <div style={{ color:T, fontSize:9, letterSpacing:"0.2em", whiteSpace:"nowrap", fontWeight:600, opacity:0.7 }}>ATLAUA CRM</div>
               </div>
             )}
           </div>
@@ -4524,7 +4524,7 @@ export default function App() {
               <AtlauaJaguarLogo size={36}/>
               <div>
                 <div style={{ color:TX1, fontSize:16, fontWeight:800 }}>ATLAUA</div>
-                <div style={{ color:TX3, fontSize:9, letterSpacing:"0.15em" }}>SPORTS CRM</div>
+                <div style={{ color:TX3, fontSize:9, letterSpacing:"0.15em" }}>ATLAUA CRM</div>
               </div>
               <button onClick={()=>setMobileNav(false)} style={{ marginLeft:"auto", background:"none", border:"none", color:TX2, fontSize:20, cursor:"pointer" }}>✕</button>
             </div>
