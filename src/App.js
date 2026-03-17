@@ -678,14 +678,14 @@ const TODAY   = new Date().toISOString().split("T")[0];
 const LEAGUES = ["NFL","NBA","NHL","MLB","UFC"];
 const STATUSES= ["Contacted","Negotiating","Proposal Sent","Closed Won","Closed Lost","Pending"];
 const ICONS   = {NFL:"",NBA:"",NHL:"",MLB:"",UFC:""};
-const TEAM_MEMBERS = ["Carlos","Maya","Adrian","Felix","Stephen","Correo General"];
+const TEAM_MEMBERS = ["Carlos","Maya","Adrian","Felix","Stephen","General Mail"];
 const TEAM_EMAIL_MAP = {
   "carlosromeu@atlaua.de":"Carlos",
   "mayakoar@atlaua.de":"Maya",
   "adriangoransch@atlaua.de":"Adrian",
   "felixgoransch@atlaua.de":"Felix",
   "stephengoransch@atlaua.de":"Stephen",
-  "info@atlaua.de":"Correo General"
+  "info@atlaua.de":"General Mail"
 };
 const ALLOWED_EMAILS = Object.keys(TEAM_EMAIL_MAP);
 
@@ -750,7 +750,7 @@ function ToastContainer() {
 const SCOL  = { Contacted:T, Negotiating:GOLD, "Proposal Sent":PURP, "Closed Won":GREEN, "Closed Lost":"#444", Pending:TX3 };
 const PCOLS = [T, WINE, GOLD, PURP, ROSE, GREEN];
 const LCOLS = { NFL:WINE, NBA:T, NHL:PURP, MLB:GREEN, UFC:GOLD };
-const MEMBER_COLORS = { Carlos:T, Maya:ROSE, Adrian:PURP, Felix:GREEN, Stephen:WINE, "Correo General":GOLD };
+const MEMBER_COLORS = { Carlos:T, Maya:ROSE, Adrian:PURP, Felix:GREEN, Stephen:WINE, "General Mail":GOLD };
 
 // ─── GOOGLE OAUTH ─────────────────────────────────────────────────────────────
 // IMPORTANT: Replace with your own Google OAuth client ID from console.cloud.google.com
