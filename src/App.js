@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, AreaChart, Area, LineChart, Line, CartesianGrid } from "recharts";
 
 // Auto-redirect to canonical URL so Google OAuth always works
-const CANONICAL_HOST = "atlaua-crm.vercel.app";
+const CANONICAL_HOST = "atlaua.vercel.app";
 if (typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== CANONICAL_HOST) {
   window.location.replace("https://" + CANONICAL_HOST + window.location.pathname + window.location.search + window.location.hash);
 }
